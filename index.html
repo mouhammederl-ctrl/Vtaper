@@ -141,7 +141,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
 // ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
@@ -255,7 +255,13 @@ async function createProfile(name, emoji) {
   return { id, ...profile };
 }
 
-// ── DEBOUNCED SAVE ─────────────────────────────────────────────────────────────
+async function deleteProfile(profileId) {
+  await deleteDoc(doc(db, "profiles", profileId));
+  await deleteDoc(doc(db, "workoutData", profileId));
+  localStorage.removeItem("vtaper_profile_id");
+}
+
+
 function scheduleSave() {
   if (!appState.isOwner || !appState.currentProfile) return;
   clearTimeout(pendingSave);
@@ -347,6 +353,41 @@ window.vtaper = {
   goOverview: () => { appState.screen = "overview"; renderOverview(); },
   goWorkout: () => { appState.screen = "workout"; renderWorkoutScreen(); },
   overviewGoWeek: (w) => { appState.week = w; appState.screen = "workout"; renderWorkoutScreen(); },
+  showDeleteConfirm: () => {
+    const app = document.getElementById("app");
+    // Inject modal overlay on top
+    let overlay = document.getElementById("delete-overlay");
+    if (overlay) return;
+    overlay = document.createElement("div");
+    overlay.id = "delete-overlay";
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:40px;margin-bottom:12px">🗑️</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:8px">Supprimer mon profil ?</div>
+          <div style="font-size:13px;color:#8E8E93;line-height:1.5">Toutes tes données (poids, notes, progression) seront <strong style="color:#FF6B35">définitivement supprimées</strong>. Impossible d'annuler.</div>
+        </div>
+        <button class="btn-primary" id="confirm-delete-btn" style="background:#FF3B30" onclick="vtaper.confirmDelete()">Oui, supprimer définitivement</button>
+        <button class="btn-secondary" onclick="document.getElementById('delete-overlay').remove()">Annuler</button>
+      </div>`;
+    app.appendChild(overlay);
+  },
+  confirmDelete: async () => {
+    const btn = document.getElementById("confirm-delete-btn");
+    if (btn) { btn.textContent = "Suppression..."; btn.disabled = true; }
+    try {
+      await deleteProfile(appState.currentProfile.id);
+      appState.profiles = appState.profiles.filter(p => p.id !== appState.currentProfile.id);
+      appState.currentProfile = null;
+      appState.isOwner = false;
+      appState.workoutData = {};
+      appState.screen = "home";
+      renderHome();
+    } catch(e) {
+      if (btn) { btn.textContent = "Erreur, réessaie"; btn.disabled = false; }
+    }
+  },
 };
 
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
@@ -522,6 +563,7 @@ function renderWorkoutScreen() {
           </div>
           <button onclick="vtaper.goOverview()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 12px;color:#F2F2F7;font-size:12px;font-weight:600">📊 12S</button>
         </div>
+        ${appState.isOwner ? `<button onclick="vtaper.showDeleteConfirm()" style="position:absolute;right:16px;top:max(env(safe-area-inset-top,48px),48px);background:transparent;border:none;color:#8E8E93;font-size:11px;font-weight:600;padding:4px 0;text-decoration:underline">Supprimer mon profil</button>` : ''}
         <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:4px">
           ${Array.from({length:12},(_,i)=>i+1).map(w => {
             const ph = getPhase(w);
