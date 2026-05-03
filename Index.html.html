@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111113" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="V-Taper 12W" />
+  <title>V-Taper 12 Semaines</title>
+
+  <!-- PWA Manifest inline -->
+  <script>
+    const manifestData = {
+      name: "V-Taper 12 Semaines",
+      short_name: "V-Taper",
+      description: "Programme musculation 12 semaines – Sèche & V-Taper",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#111113",
+      theme_color: "#111113",
+      orientation: "portrait",
+      icons: [
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23111113'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E💪%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" },
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%23111113'/%3E%3Ctext x='256' y='350' font-size='300' text-anchor='middle'%3E💪%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    document.write('<link rel="manifest" href="' + manifestURL + '">');
+  </script>
+
+  <!-- Apple touch icon -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%23111113'/%3E%3Ctext x='90' y='125' font-size='100' text-anchor='middle'%3E💪%3C/text%3E%3C/svg%3E" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      min-height: 100vh; min-height: 100dvh;
+      background: #111113; color: #F2F2F7;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      overscroll-behavior: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    html, body { height: 100%; overflow: hidden; }
+    #app {
+      max-width: 430px; margin: 0 auto;
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input { font-family: inherit; }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    ::-webkit-scrollbar { display: none; }
+    scrollbar-width: none;
+
+    /* Fixed top section: header + day tabs */
+    #top-fixed {
+      flex-shrink: 0;
+      background: #111113;
+      z-index: 20;
+    }
+    .header {
+      padding: env(safe-area-inset-top, 48px) 16px 12px;
+      padding-top: max(env(safe-area-inset-top, 48px), 48px);
+      border-bottom: 1px solid #1E1E20;
+    }
+    .day-tabs {
+      display: flex; gap: 8px; padding: 10px 16px;
+      overflow-x: auto; scrollbar-width: none;
+      border-bottom: 1px solid #1E1E20;
+    }
+
+    /* Scrollable content */
+    #scroll-content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .timer-bar {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px; z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .week-btn {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 10px;
+      border: 2px solid transparent; font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .day-tab {
+      flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+      border: none; font-size: 12px; font-weight: 700;
+      transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+    }
+    .exercise-card {
+      border-radius: 16px; padding: 14px; margin-bottom: 10px;
+      border: 1px solid #2C2C2E; transition: all 0.3s;
+    }
+    .exercise-card.done { background: #0F200F; border-color: #2D5A2D; }
+    .exercise-card:not(.done) { background: #1C1C1E; }
+
+    .checkbox-btn {
+      width: 26px; height: 26px; border-radius: 13px; flex-shrink: 0;
+      border: 2px solid; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; background: transparent;
+    }
+    .weight-input-wrap {
+      flex: 1; display: flex; align-items: center;
+      background: #111113; border-radius: 10px; padding: 7px 12px; gap: 6px;
+    }
+    .weight-input {
+      background: transparent; border: none; outline: none;
+      font-size: 14px; width: 100%; color: #8E8E93;
+    }
+    .notes-input {
+      margin-top: 8px; width: 100%; background: #111113;
+      border: none; border-radius: 8px; padding: 6px 10px;
+      color: #8E8E93; font-size: 12px; outline: none;
+    }
+    .progress-bar-wrap { flex: 1; height: 5px; background: #2C2C2E; border-radius: 3px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+    .coach-block {
+      background: #1C1C1E; border-radius: 16px; padding: 14px 16px;
+    }
+    .overview-week-btn {
+      width: 72px; border-radius: 12px; padding: 10px 8px;
+      cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const PHASES = [
+  { weeks:[1,2,3,4], name:"PHASE 1", label:"Mise en route", color:"#4ECDC4", desc:"Construire les bases, apprendre les mouvements, activer le métabolisme." },
+  { weeks:[5,6,7,8], name:"PHASE 2", label:"Surcharge progressive", color:"#FF6B35", desc:"Augmenter les charges semaine après semaine. C'est ici que le corps change." },
+  { weeks:[9,10,11,12], name:"PHASE 3", label:"Intensification", color:"#A855F7", desc:"Drop sets, supsets, amplitude maximale. Finition du V-Taper et brûle-gras final." },
+];
+const getPhase = w => PHASES.find(p => p.weeks.includes(w));
+
+const buildDay = (dayKey, week) => {
+  const phase = week <= 4 ? 1 : week <= 8 ? 2 : 3;
+  const p = phase - 1;
+  const days = {
+    LUNDI: { label:"PUSH", sub:"Pectoraux / Épaules / Triceps", emoji:"💪", color:"#FF6B35", exercises:[
+      { id:"l1", name:"Développé Incliné Haltères", type:"big", sets:[4,4,5][p], reps:["8-10","6-8","5-6"][p], note:"Exo roi du haut du corps — priorité absolue" },
+      { id:"l2", name:"Développé Couché Machine", type:"big", sets:[3,4,4][p], reps:["10-12","8-10","8"][p], note:"" },
+      { id:"l3", name:"Développé Militaire Haltères (Assis)", type:"big", sets:[3,4,4][p], reps:["10","8-10","8"][p], note:"" },
+      { id:"l4", name:"Élévations Latérales Haltères", type:"small", sets:[4,4,5][p], reps:["15-20","15-20","15 + drop"][p], note:"Clé du V-taper — ne pas négliger" },
+      { id:"l5", name:"Extensions Triceps Corde (Poulie)", type:"small", sets:[3,3,4][p], reps:["12-15","12","12 + drop"][p], note:"" },
+      { id:"l6", name:"Dips Machine", type:"small", sets:[3,3,3][p], reps:["échec","échec","échec"][p], note:"" },
+      { id:"l7", name:"Rotation Externe Poulie (Coiffe)", type:"small", sets:[2,2,2][p], reps:["15","15","15"][p], note:"🛡️ Protection épaule — ne pas sauter" },
+    ]},
+    MARDI: { label:"PULL", sub:"Dos / Arrière Épaule / Biceps", emoji:"🏋️", color:"#4ECDC4", exercises:[
+      { id:"m1", name:"Tractions / Tirage Vertical Large", type:"big", sets:[4,4,5][p], reps:["8-10","6-8","6"][p], note:"Largeur du dos = largeur du V" },
+      { id:"m2", name:"Rowing T-Bar ou Haltère", type:"big", sets:[3,4,4][p], reps:["10","8-10","8"][p], note:"Épaisseur centrale" },
+      { id:"m3", name:"Tirage Horizontal Poulie Basse", type:"small", sets:[3,3,4][p], reps:["12","12","10-12"][p], note:"" },
+      { id:"m4", name:"Face-Pull Corde", type:"small", sets:[3,3,3][p], reps:["15","15","15"][p], note:"🛡️ Posture + arrière épaule — priorité" },
+      { id:"m5", name:"Curl Haltères (Biceps)", type:"small", sets:[3,3,4][p], reps:["12","10-12","10"][p], note:"" },
+      { id:"m6", name:"Hammer Curl (Brachial)", type:"small", sets:[3,3,3][p], reps:["12","12","12"][p], note:"" },
+    ]},
+    JEUDI: { label:"LEGS", sub:"Moteur Thermique – Anti-bourrelets", emoji:"🦵", color:"#A855F7", exercises:[
+      { id:"j1", name:"Presse à Cuisses Inclinée", type:"big", sets:[4,4,5][p], reps:["10-12","8-10","8"][p], note:"Lourd mais contrôlé" },
+      { id:"j2", name:"Fentes Marchées Haltères", type:"big", sets:[3,4,4][p], reps:["20 pas","24 pas","24 pas"][p], note:"Cardio intense — garde le dos droit" },
+      { id:"j3", name:"Leg Extension (Quadriceps)", type:"small", sets:[3,3,4][p], reps:["15","15","15 + drop"][p], note:"" },
+      { id:"j4", name:"Leg Curl Assis (Ischios)", type:"small", sets:[3,3,3][p], reps:["12-15","12","12"][p], note:"" },
+      { id:"j5", name:"Mollets à la Presse", type:"small", sets:[4,4,4][p], reps:["15","20","20"][p], note:"" },
+      { id:"j6", name:"Gainage Planche", type:"small", sets:[3,3,3][p], reps:["45s","1 min","1 min"][p], note:"" },
+    ]},
+    VENDREDI: { label:"ABDOS + CARDIO", sub:"Finition V-Taper & Brûle-gras", emoji:"⚡", color:"#F59E0B", exercises:[
+      { id:"v1", name:"Relevés de Jambes (Chaise Romaine)", type:"big", sets:[4,4,5][p], reps:["15","15-20","20"][p], note:"Bas du ventre — respire bien" },
+      { id:"v2", name:"Crunch Poulie Haute (Lourd)", type:"big", sets:[3,4,4][p], reps:["15-20","15","12-15"][p], note:"Charge suffisante pour sentir la contraction" },
+      { id:"v3", name:"Planche Latérale", type:"small", sets:[3,3,4][p], reps:["30s","45s","45s"][p], note:"Affine la taille — côté gauche puis droit" },
+      { id:"v4", name:"Russian Twist Lesté", type:"small", sets:[3,3,3][p], reps:["20","20","20"][p], note:"" },
+      { id:"v5", name:"Tapis Incliné (Marche rapide)", type:"small", sets:[1,1,1][p], reps:["10 min","12 min","15 min"][p], note:"Vitesse 6 / Inclinaison 10 — respire par le nez" },
+    ]},
+  };
+  return days[dayKey];
+};
+
+const DAYS_ORDER = ["LUNDI","MARDI","JEUDI","VENDREDI"];
+const REST_BIG = 90, REST_SMALL = 45;
+const storageKey = (w, d, id, t) => `w${w}_${d}_${id}_${t}`;
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let state = {
+  week: 1,
+  day: 0,
+  view: "workout",
+  data: {},
+  timer: { active: false, left: 0, label: "", total: 0 },
+};
+
+let timerInterval = null;
+
+function loadStorage() {
+  try { const s = localStorage.getItem("vtaper_12w"); if (s) state.data = JSON.parse(s); } catch {}
+}
+function saveStorage() {
+  try { localStorage.setItem("vtaper_12w", JSON.stringify(state.data)); } catch {}
+}
+function get(k) { return state.data[k]; }
+function set(k, v) { state.data[k] = v; saveStorage(); render(); }
+
+function fmt(s) { return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+
+function startTimer(secs, label) {
+  clearInterval(timerInterval);
+  state.timer = { active: true, left: secs, label, total: secs };
+  timerInterval = setInterval(() => {
+    if (state.timer.left <= 1) {
+      clearInterval(timerInterval);
+      state.timer = { ...state.timer, active: false, left: 0 };
+      // Vibrate if supported
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } else {
+      state.timer.left -= 1;
+    }
+    renderTimerBar();
+    renderTimerProgress();
+  }, 1000);
+  render();
+}
+function stopTimer() {
+  clearInterval(timerInterval);
+  state.timer = { active: false, left: 0, label: "", total: 0 };
+  render();
+}
+function togglePause() {
+  if (state.timer.active) {
+    clearInterval(timerInterval);
+    state.timer.active = false;
+    renderTimerBar();
+  } else {
+    state.timer.active = true;
+    timerInterval = setInterval(() => {
+      if (state.timer.left <= 1) {
+        clearInterval(timerInterval);
+        state.timer = { ...state.timer, active: false, left: 0 };
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      } else {
+        state.timer.left -= 1;
+      }
+      renderTimerBar();
+      renderTimerProgress();
+    }, 1000);
+    renderTimerBar();
+  }
+}
+
+// ─── RENDER HELPERS ──────────────────────────────────────────────────────────
+function renderTimerBar() {
+  const bar = document.getElementById("timer-bar");
+  if (!bar) return;
+  const t = state.timer;
+  const dayData = buildDay(DAYS_ORDER[state.day], state.week);
+  if (!t.active && t.left === 0) {
+    bar.style.display = "none"; return;
+  }
+  bar.style.display = "block";
+  bar.style.background = t.left === 0 ? "#30D158" : "#1C1C1E";
+  bar.style.borderTop = `2px solid ${t.left === 0 ? "#30D158" : dayData.color}`;
+  const timeEl = bar.querySelector(".timer-time");
+  const labelEl = bar.querySelector(".timer-label");
+  const pauseBtn = bar.querySelector(".timer-pause");
+  if (timeEl) timeEl.textContent = t.left === 0 ? "C'est parti 🚀" : fmt(t.left);
+  if (timeEl) timeEl.style.color = t.left === 0 ? "#fff" : dayData.color;
+  if (labelEl) labelEl.textContent = "⏱ " + t.label;
+  if (pauseBtn) {
+    pauseBtn.textContent = t.active ? "⏸" : "▶️";
+    pauseBtn.style.display = t.left > 0 ? "block" : "none";
+  }
+}
+function renderTimerProgress() {
+  const prog = document.getElementById("timer-progress");
+  if (!prog) return;
+  const t = state.timer;
+  if (t.total > 0 && t.left > 0) {
+    prog.style.width = `${(t.left / t.total) * 100}%`;
+  } else {
+    prog.style.width = "0%";
+  }
+}
+
+// ─── MAIN RENDER ──────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById("app");
+  if (state.view === "overview") { renderOverview(app); return; }
+  renderWorkout(app);
+}
+
+function renderWorkout(app) {
+  const week = state.week;
+  const dayKey = DAYS_ORDER[state.day];
+  const dayData = buildDay(dayKey, week);
+  const phase = getPhase(week);
+
+  const checked = dayData.exercises.filter(e => get(storageKey(week, dayKey, e.id, "done"))).length;
+  const pct = Math.round((checked / dayData.exercises.length) * 100);
+
+  const totalExos = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.length, 0);
+  const doneExos = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.filter(e => get(storageKey(week,d,e.id,"done"))).length, 0);
+  const weekPct = Math.round((doneExos/totalExos)*100);
+
+  app.innerHTML = `
+    <!-- FIXED TOP: HEADER + DAY TABS -->
+    <div id="top-fixed">
+      <div class="header">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:#8E8E93;margin-bottom:2px">📒 Notes · Sèche &amp; V-Taper</div>
+            <div style="font-size:22px;font-weight:700;letter-spacing:-0.5px">
+              Semaine ${week} <span style="color:${phase.color};font-size:14px;font-weight:600">· ${phase.label}</span>
+            </div>
+          </div>
+          <button onclick="state.view='overview';render()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 12px;color:#F2F2F7;font-size:12px;font-weight:600">📊 12S</button>
+        </div>
+        <!-- Week selector -->
+        <div style="display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px">
+          ${Array.from({length:12},(_,i)=>i+1).map(w => {
+            const ph = getPhase(w);
+            const active = w === week;
+            return `<button class="week-btn" onclick="state.week=${w};render()" style="background:${active?ph.color+'30':'#2C2C2E'};border-color:${active?ph.color:'transparent'};color:${active?ph.color:'#8E8E93'}">${w}</button>`;
+          }).join("")}
+        </div>
+        <!-- Week progress -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <div class="progress-bar-wrap"><div class="progress-bar" style="width:${weekPct}%;background:${phase.color}"></div></div>
+          <span style="font-size:11px;color:#8E8E93">${weekPct}% semaine</span>
+        </div>
+      </div>
+
+      <!-- DAY TABS (fixed, ne défilent pas) -->
+      <div class="day-tabs">
+        ${DAYS_ORDER.map((dk, i) => {
+          const dd = buildDay(dk, week);
+          const done = dd.exercises.filter(e => get(storageKey(week,dk,e.id,"done"))).length;
+          const full = done === dd.exercises.length;
+          const active = i === state.day;
+          return `<button class="day-tab" onclick="state.day=${i};render()" style="background:${active?dd.color:'#2C2C2E'};color:${active?'#fff':full?'#30D158':'#8E8E93'}">
+            ${dd.emoji} ${dk} ${full?"✅":""}
+          </button>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <!-- SCROLLABLE CONTENT -->
+    <div id="scroll-content">
+      <!-- DAY HEADER -->
+      <div style="padding:16px 16px 8px">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div style="font-size:20px;font-weight:700;color:${dayData.color}">${dayData.label}</div>
+          <div style="font-size:12px;color:#8E8E93">${dayData.sub}</div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px">
+          <div style="font-size:10px;color:#8E8E93">🔥 Gros exo = 1min30</div>
+          <div style="font-size:10px;color:#8E8E93">⚡ Petit exo = 45s</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%;background:${dayData.color}"></div></div>
+          <span style="font-size:11px;color:#8E8E93">${checked}/${dayData.exercises.length}</span>
+        </div>
+      </div>
+
+      <!-- EXERCISES -->
+      <div style="padding:0 12px">
+        ${dayData.exercises.map(ex => {
+        const isDone = !!get(storageKey(week, dayKey, ex.id, "done"));
+        const weight = get(storageKey(week, dayKey, ex.id, "weight")) || "";
+        const notes = get(storageKey(week, dayKey, ex.id, "notes")) || "";
+        const isBig = ex.type === "big";
+        const prevW = week > 1 ? get(storageKey(week-1, dayKey, ex.id, "weight")) : null;
+        return `
+          <div class="exercise-card ${isDone?'done':''}">
+            <div style="display:flex;gap:12px">
+              <button class="checkbox-btn" onclick="set('${storageKey(week,dayKey,ex.id,"done")}',${!isDone})"
+                style="border-color:${isDone?'#30D158':dayData.color};background:${isDone?'#30D158':'transparent'}">
+                ${isDone?'<span style="color:#fff;font-size:14px;line-height:1">✓</span>':''}
+              </button>
+              <div style="flex:1">
+                <span style="font-size:9px;font-weight:800;letter-spacing:0.8px;color:${isBig?'#FF6B35':'#4ECDC4'};background:${isBig?'#FF6B3518':'#4ECDC418'};padding:2px 7px;border-radius:5px">
+                  ${isBig?'🔥 GROS EXO':'⚡ PETIT EXO'}
+                </span>
+                <div style="font-size:15px;font-weight:700;color:${isDone?'#8E8E93':'#F2F2F7'};text-decoration:${isDone?'line-through':'none'};margin-top:5px;line-height:1.3">${ex.name}</div>
+                <div style="font-size:13px;color:${dayData.color};font-weight:600;margin-top:3px">${ex.sets} séries × ${ex.reps} reps</div>
+                ${ex.note?`<div style="font-size:11px;color:#8E8E93;margin-top:4px;font-style:italic;line-height:1.4">💬 ${ex.note}</div>`:''}
+                ${prevW?`<div style="font-size:11px;color:#8E8E93;margin-top:4px">S${week-1} : <span style="color:#F59E0B;font-weight:700">${prevW} kg</span> → vise +2.5kg 🎯</div>`:''}
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+                  <div class="weight-input-wrap">
+                    <span style="font-size:13px">🏋️</span>
+                    <input type="number" inputmode="decimal" placeholder="Ton poids (kg)"
+                      value="${weight}"
+                      onchange="set('${storageKey(week,dayKey,ex.id,"weight")}',this.value)"
+                      class="weight-input"
+                      style="color:${weight?dayData.color:'#8E8E93'};font-weight:${weight?'700':'400'}" />
+                    ${weight?`<span style="font-size:11px;color:#8E8E93">kg</span>`:''}
+                  </div>
+                  <button onclick="startTimer(${isBig?REST_BIG:REST_SMALL},'${ex.name.replace(/'/g,"")}')"
+                    style="background:${isBig?'#FF6B3520':'#4ECDC420'};border:1px solid ${isBig?'#FF6B35':'#4ECDC4'};border-radius:10px;padding:7px 12px;color:${isBig?'#FF6B35':'#4ECDC4'};font-size:12px;font-weight:700;white-space:nowrap">
+                    ⏱ ${isBig?'1:30':'0:45'}
+                  </button>
+                </div>
+                <input type="text" placeholder="Notes perso..."
+                  value="${(get(storageKey(week,dayKey,ex.id,"notes"))||'').replace(/"/g,'&quot;')}"
+                  oninput="set('${storageKey(week,dayKey,ex.id,"notes")}',this.value)"
+                  class="notes-input"
+                  style="color:${notes?'#F59E0B':'#8E8E93'}" />
+              </div>
+            </div>
+          </div>`;
+      }).join("")}
+      </div>
+
+      <!-- COACH BLOCK -->
+      <div style="padding:4px 12px 24px">
+        <div class="coach-block" style="border-left:3px solid ${phase.color}">
+          <div style="font-size:12px;font-weight:800;color:${phase.color};margin-bottom:8px;letter-spacing:0.5px">⚙️ COACH — ${phase.name}</div>
+          ${[
+            "🚶 10 000 pas / jour minimum",
+            "💤 8h de sommeil — Cortisol = gras sur les hanches",
+            "📵 Garde le rythme entre les séries, pas de scroll",
+            ...(week<=4?["🎯 Phase 1 : Maîtrise les mouvements avant d'augmenter"]:week<=8?["📈 Phase 2 : +2.5kg toutes les 1-2 semaines si possible"]:["🔥 Phase 3 : Drop sets = 1 série, puis -30% charge, à l'échec"])
+          ].map(t=>`<div style="font-size:12px;color:#8E8E93;margin-bottom:5px;line-height:1.5">${t}</div>`).join("")}
+        </div>
+      </div>
+    </div><!-- end scroll-content -->
+
+    <!-- TIMER BAR (fixed, outside scroll) -->
+    <div class="timer-bar" id="timer-bar" style="display:none;background:#1C1C1E;border-top:2px solid #FF6B35">
+      <div style="height:3px;background:#2C2C2E"><div id="timer-progress" style="height:100%;background:#FF6B35;transition:width 1s linear;width:100%"></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
+        <div>
+          <div class="timer-label" style="font-size:10px;color:#8E8E93;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⏱</div>
+          <div class="timer-time" style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;color:#FF6B35;line-height:1">0:00</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="timer-pause" onclick="togglePause()" style="background:#2C2C2E;border:none;border-radius:10px;padding:10px 14px;color:#F2F2F7;font-size:18px">⏸</button>
+          <button onclick="stopTimer()" style="background:#2C2C2E;border:none;border-radius:10px;padding:10px 14px;color:#F2F2F7;font-size:18px">✕</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  renderTimerBar();
+  renderTimerProgress();
+}
+
+function renderOverview(app) {
+  const week = state.week;
+  const totalAll = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.length, 0);
+  const doneAll = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.filter(e => get(storageKey(week,d,e.id,"done"))).length, 0);
+
+  app.innerHTML = `
+    <div style="min-height:100vh;background:#111113;padding-bottom:40px">
+      <div style="padding:max(env(safe-area-inset-top,48px),48px) 20px 16px;border-bottom:1px solid #2C2C2E;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;color:#8E8E93">📊 Vue d'ensemble</div>
+          <div style="font-size:26px;font-weight:700">12 Semaines</div>
+        </div>
+        <button onclick="state.view='workout';render()" style="background:#2C2C2E;border:none;border-radius:10px;padding:8px 14px;color:#F2F2F7;font-size:13px">← Retour</button>
+      </div>
+
+      ${PHASES.map(ph => `
+        <div style="padding:16px 16px 0">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:${ph.color};margin-bottom:8px">${ph.name} — ${ph.label}</div>
+          <div style="font-size:12px;color:#8E8E93;margin-bottom:10px;line-height:1.5">${ph.desc}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            ${ph.weeks.map(w => {
+              const tot = DAYS_ORDER.reduce((a,d) => a + buildDay(d,w).exercises.length, 0);
+              const done = DAYS_ORDER.reduce((a,d) => a + buildDay(d,w).exercises.filter(e => get(storageKey(w,d,e.id,"done"))).length, 0);
+              const p = Math.round((done/tot)*100);
+              const isCurrent = w === week;
+              return `<button class="overview-week-btn" onclick="state.week=${w};state.view='workout';render()"
+                style="background:${isCurrent?ph.color:p===100?'#1A3A1A':'#2C2C2E'};border:2px solid ${isCurrent?ph.color:p===100?'#30D158':'transparent'}">
+                <div style="font-size:13px;font-weight:700;color:${isCurrent?'#fff':p===100?'#30D158':'#F2F2F7'}">S${w}</div>
+                <div style="font-size:10px;color:${isCurrent?'rgba(255,255,255,0.7)':'#8E8E93'};margin-top:2px">${p}%</div>
+                ${p===100?'<div style="font-size:14px;margin-top:2px">✅</div>':''}
+              </button>`;
+            }).join("")}
+          </div>
+        </div>
+      `).join("")}
+
+      <div style="margin:8px 16px 0;background:#2C2C2E;border-radius:14px;padding:14px 16px">
+        <div style="font-size:13px;font-weight:700;color:#F2F2F7;margin-bottom:12px">📈 Progression globale</div>
+        ${PHASES.map(ph => {
+          const tot = ph.weeks.reduce((a,w) => a + DAYS_ORDER.reduce((b,d) => b + buildDay(d,w).exercises.length, 0), 0);
+          const done = ph.weeks.reduce((a,w) => a + DAYS_ORDER.reduce((b,d) => b + buildDay(d,w).exercises.filter(e => get(storageKey(w,d,e.id,"done"))).length, 0), 0);
+          const p = Math.round((done/tot)*100);
+          return `<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:#8E8E93">${ph.name}</span>
+              <span style="font-size:12px;color:${ph.color}">${p}%</span>
+            </div>
+            <div style="height:4px;background:#1C1C1E;border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${p}%;background:${ph.color};border-radius:2px;transition:width 0.5s"></div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadStorage();
+render();
+
+// ─── SERVICE WORKER ──────────────────────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  const swCode = `
+    const CACHE = 'vtaper-v1';
+    self.addEventListener('install', e => {
+      self.skipWaiting();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request).catch(() => new Response('Offline', {status: 503})))
+      );
+    });
+  `;
+  const swBlob = new Blob([swCode], {type: "application/javascript"});
+  const swURL = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swURL).catch(() => {});
+}
+</script>
+</body>
+</html>
