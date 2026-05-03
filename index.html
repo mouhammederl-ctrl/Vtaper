@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111113" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="V-Taper 12W" />
+  <title>V-Taper 12 Semaines</title>
+
+  <script>
+    const manifestData = {
+      name: "V-Taper 12 Semaines", short_name: "V-Taper",
+      description: "Programme musculation 12 semaines", start_url: ".",
+      display: "standalone", background_color: "#111113", theme_color: "#111113",
+      orientation: "portrait",
+      icons: [
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23111113'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E💪%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifestData)], {type:'application/json'});
+    document.write('<link rel="manifest" href="' + URL.createObjectURL(blob) + '">');
+  </script>
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%23111113'/%3E%3Ctext x='90' y='125' font-size='100' text-anchor='middle'%3E💪%3C/text%3E%3C/svg%3E" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; background: #111113; }
+    body {
+      color: #F2F2F7;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      overscroll-behavior: none; -webkit-font-smoothing: antialiased;
+    }
+    #app {
+      max-width: 430px; margin: 0 auto;
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input { font-family: inherit; }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    ::-webkit-scrollbar { display: none; }
+
+    #top-fixed { flex-shrink: 0; background: #111113; z-index: 20; }
+    .header {
+      padding: env(safe-area-inset-top, 48px) 16px 12px;
+      padding-top: max(env(safe-area-inset-top, 48px), 48px);
+      border-bottom: 1px solid #1E1E20;
+    }
+    .day-tabs {
+      display: flex; gap: 8px; padding: 10px 16px;
+      overflow-x: auto; border-bottom: 1px solid #1E1E20;
+    }
+    #scroll-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    .week-btn {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 10px;
+      border: 2px solid transparent; font-size: 12px; font-weight: 700;
+    }
+    .day-tab {
+      flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+      border: none; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .exercise-card { border-radius: 16px; padding: 14px; margin-bottom: 10px; border: 1px solid #2C2C2E; }
+    .exercise-card.done { background: #0F200F; border-color: #2D5A2D; }
+    .exercise-card:not(.done) { background: #1C1C1E; }
+    .checkbox-btn {
+      width: 26px; height: 26px; border-radius: 13px; flex-shrink: 0;
+      border: 2px solid; display: flex; align-items: center; justify-content: center;
+    }
+    .weight-input-wrap { flex: 1; display: flex; align-items: center; background: #111113; border-radius: 10px; padding: 7px 12px; gap: 6px; }
+    .weight-input { background: transparent; border: none; outline: none; font-size: 14px; width: 100%; }
+    .notes-input { margin-top: 8px; width: 100%; background: #111113; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; outline: none; }
+    .progress-bar-wrap { flex: 1; height: 5px; background: #2C2C2E; border-radius: 3px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
+    .timer-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    /* ── HOME SCREEN ── */
+    #home-screen { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .profile-card {
+      display: flex; align-items: center; gap: 14px;
+      background: #1C1C1E; border-radius: 16px; padding: 14px 16px;
+      margin-bottom: 10px; border: 1px solid #2C2C2E; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .profile-card:active { opacity: 0.7; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 24px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 200; padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .modal-box {
+      background: #1C1C1E; border-radius: 24px 24px 0 0;
+      padding: 24px 20px 32px; width: 100%; max-width: 430px;
+    }
+    .modal-input {
+      width: 100%; background: #2C2C2E; border: none; border-radius: 12px;
+      padding: 14px 16px; color: #F2F2F7; font-size: 16px; outline: none;
+      font-family: inherit; margin-bottom: 12px;
+    }
+    .btn-primary {
+      width: 100%; padding: 14px; border-radius: 14px; border: none;
+      font-size: 16px; font-weight: 700; color: #fff; cursor: pointer;
+    }
+    .btn-secondary {
+      width: 100%; padding: 12px; border-radius: 14px; border: none;
+      font-size: 14px; font-weight: 600; color: #8E8E93;
+      background: transparent; cursor: pointer; margin-top: 8px;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #2C2C2E;
+      border-top-color: #4ECDC4; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .readonly-badge {
+      font-size: 10px; font-weight: 700; padding: 3px 8px;
+      border-radius: 6px; background: #2C2C2E; color: #8E8E93;
+    }
+  </style>
+</head>
+<body>
+<div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBkyLiSPr62Mel-dMihaGPkYb8A6_lLO9g",
+  authDomain: "v-taper.firebaseapp.com",
+  projectId: "v-taper",
+  storageBucket: "v-taper.firebasestorage.app",
+  messagingSenderId: "937594998941",
+  appId: "1:937594998941:web:15ad773450290bc81a4474",
+  measurementId: "G-D88SW7D1G1"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+// ── PROGRAMME DATA ────────────────────────────────────────────────────────────
+const PHASES = [
+  { weeks:[1,2,3,4], name:"PHASE 1", label:"Mise en route", color:"#4ECDC4", desc:"Construire les bases, apprendre les mouvements, activer le métabolisme." },
+  { weeks:[5,6,7,8], name:"PHASE 2", label:"Surcharge progressive", color:"#FF6B35", desc:"Augmenter les charges semaine après semaine. C'est ici que le corps change." },
+  { weeks:[9,10,11,12], name:"PHASE 3", label:"Intensification", color:"#A855F7", desc:"Drop sets, supsets, amplitude maximale. Finition du V-Taper et brûle-gras final." },
+];
+const getPhase = w => PHASES.find(p => p.weeks.includes(w));
+
+const buildDay = (dayKey, week) => {
+  const p = (week <= 4 ? 1 : week <= 8 ? 2 : 3) - 1;
+  const days = {
+    LUNDI: { label:"PUSH", sub:"Pectoraux / Épaules / Triceps", emoji:"💪", color:"#FF6B35", exercises:[
+      { id:"l1", name:"Développé Incliné Haltères", type:"big", sets:[4,4,5][p], reps:["8-10","6-8","5-6"][p], note:"Exo roi du haut du corps — priorité absolue" },
+      { id:"l2", name:"Développé Couché Machine", type:"big", sets:[3,4,4][p], reps:["10-12","8-10","8"][p], note:"" },
+      { id:"l3", name:"Développé Militaire Haltères (Assis)", type:"big", sets:[3,4,4][p], reps:["10","8-10","8"][p], note:"" },
+      { id:"l4", name:"Élévations Latérales Haltères", type:"small", sets:[4,4,5][p], reps:["15-20","15-20","15 + drop"][p], note:"Clé du V-taper — ne pas négliger" },
+      { id:"l5", name:"Extensions Triceps Corde (Poulie)", type:"small", sets:[3,3,4][p], reps:["12-15","12","12 + drop"][p], note:"" },
+      { id:"l6", name:"Dips Machine", type:"small", sets:[3,3,3][p], reps:["échec","échec","échec"][p], note:"" },
+      { id:"l7", name:"Rotation Externe Poulie (Coiffe)", type:"small", sets:[2,2,2][p], reps:["15","15","15"][p], note:"🛡️ Protection épaule — ne pas sauter" },
+    ]},
+    MARDI: { label:"PULL", sub:"Dos / Arrière Épaule / Biceps", emoji:"🏋️", color:"#4ECDC4", exercises:[
+      { id:"m1", name:"Tractions / Tirage Vertical Large", type:"big", sets:[4,4,5][p], reps:["8-10","6-8","6"][p], note:"Largeur du dos = largeur du V" },
+      { id:"m2", name:"Rowing T-Bar ou Haltère", type:"big", sets:[3,4,4][p], reps:["10","8-10","8"][p], note:"Épaisseur centrale" },
+      { id:"m3", name:"Tirage Horizontal Poulie Basse", type:"small", sets:[3,3,4][p], reps:["12","12","10-12"][p], note:"" },
+      { id:"m4", name:"Face-Pull Corde", type:"small", sets:[3,3,3][p], reps:["15","15","15"][p], note:"🛡️ Posture + arrière épaule — priorité" },
+      { id:"m5", name:"Curl Haltères (Biceps)", type:"small", sets:[3,3,4][p], reps:["12","10-12","10"][p], note:"" },
+      { id:"m6", name:"Hammer Curl (Brachial)", type:"small", sets:[3,3,3][p], reps:["12","12","12"][p], note:"" },
+    ]},
+    JEUDI: { label:"LEGS", sub:"Moteur Thermique – Anti-bourrelets", emoji:"🦵", color:"#A855F7", exercises:[
+      { id:"j1", name:"Presse à Cuisses Inclinée", type:"big", sets:[4,4,5][p], reps:["10-12","8-10","8"][p], note:"Lourd mais contrôlé" },
+      { id:"j2", name:"Fentes Marchées Haltères", type:"big", sets:[3,4,4][p], reps:["20 pas","24 pas","24 pas"][p], note:"Cardio intense — garde le dos droit" },
+      { id:"j3", name:"Leg Extension (Quadriceps)", type:"small", sets:[3,3,4][p], reps:["15","15","15 + drop"][p], note:"" },
+      { id:"j4", name:"Leg Curl Assis (Ischios)", type:"small", sets:[3,3,3][p], reps:["12-15","12","12"][p], note:"" },
+      { id:"j5", name:"Mollets à la Presse", type:"small", sets:[4,4,4][p], reps:["15","20","20"][p], note:"" },
+      { id:"j6", name:"Gainage Planche", type:"small", sets:[3,3,3][p], reps:["45s","1 min","1 min"][p], note:"" },
+    ]},
+    VENDREDI: { label:"ABDOS + CARDIO", sub:"Finition V-Taper & Brûle-gras", emoji:"⚡", color:"#F59E0B", exercises:[
+      { id:"v1", name:"Relevés de Jambes (Chaise Romaine)", type:"big", sets:[4,4,5][p], reps:["15","15-20","20"][p], note:"Bas du ventre — respire bien" },
+      { id:"v2", name:"Crunch Poulie Haute (Lourd)", type:"big", sets:[3,4,4][p], reps:["15-20","15","12-15"][p], note:"" },
+      { id:"v3", name:"Planche Latérale", type:"small", sets:[3,3,4][p], reps:["30s","45s","45s"][p], note:"Affine la taille — côté gauche puis droit" },
+      { id:"v4", name:"Russian Twist Lesté", type:"small", sets:[3,3,3][p], reps:["20","20","20"][p], note:"" },
+      { id:"v5", name:"Tapis Incliné (Marche rapide)", type:"small", sets:[1,1,1][p], reps:["10 min","12 min","15 min"][p], note:"Vitesse 6 / Inclinaison 10 — respire par le nez" },
+    ]},
+  };
+  return days[dayKey];
+};
+
+const DAYS_ORDER = ["LUNDI","MARDI","JEUDI","VENDREDI"];
+const REST_BIG = 90, REST_SMALL = 45;
+const EMOJIS = ["💪","🔥","⚡","🏋️","🦵","🎯","👊","🚀","💥","🏆","⚙️","🌟"];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let appState = {
+  screen: "home",       // "home" | "workout" | "overview"
+  profiles: [],
+  currentProfile: null, // { id, name, emoji, secretKey }
+  isOwner: false,
+  week: 1, day: 0,
+  workoutData: {},       // données chargées depuis Firestore pour le profil courant
+  timer: { active: false, left: 0, label: "", total: 0 },
+  saving: false,
+};
+let timerInterval = null;
+let pendingSave = null;  // debounce
+
+// ── LOCAL SECRET KEY ──────────────────────────────────────────────────────────
+function getMySecretKey() {
+  let k = localStorage.getItem("vtaper_secret");
+  if (!k) { k = crypto.randomUUID(); localStorage.setItem("vtaper_secret", k); }
+  return k;
+}
+function getMyProfileId() { return localStorage.getItem("vtaper_profile_id"); }
+function setMyProfileId(id) { localStorage.setItem("vtaper_profile_id", id); }
+
+// ── FIRESTORE HELPERS ─────────────────────────────────────────────────────────
+async function loadProfiles() {
+  const snap = await getDocs(collection(db, "profiles"));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function loadWorkoutData(profileId) {
+  const snap = await getDoc(doc(db, "workoutData", profileId));
+  return snap.exists() ? snap.data() : {};
+}
+
+async function saveWorkoutData(profileId, data) {
+  await setDoc(doc(db, "workoutData", profileId), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+async function createProfile(name, emoji) {
+  const secretKey = getMySecretKey();
+  const id = name.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
+  const profile = { name, emoji, secretKey, createdAt: serverTimestamp() };
+  await setDoc(doc(db, "profiles", id), profile);
+  setMyProfileId(id);
+  return { id, ...profile };
+}
+
+// ── DEBOUNCED SAVE ─────────────────────────────────────────────────────────────
+function scheduleSave() {
+  if (!appState.isOwner || !appState.currentProfile) return;
+  clearTimeout(pendingSave);
+  pendingSave = setTimeout(async () => {
+    try {
+      await saveWorkoutData(appState.currentProfile.id, appState.workoutData);
+    } catch(e) { console.error("Save error", e); }
+  }, 800);
+}
+
+// ── DATA GETTERS/SETTERS ──────────────────────────────────────────────────────
+const sk = (w,d,id,t) => `w${w}_${d}_${id}_${t}`;
+function getData(k) { return appState.workoutData[k]; }
+function setData(k, v) {
+  if (!appState.isOwner) return;
+  appState.workoutData[k] = v;
+  scheduleSave();
+  renderWorkoutContent();
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+function fmt(s) { return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+function startTimer(secs, label) {
+  clearInterval(timerInterval);
+  appState.timer = { active: true, left: secs, label, total: secs };
+  timerInterval = setInterval(() => {
+    if (appState.timer.left <= 1) {
+      clearInterval(timerInterval);
+      appState.timer = { ...appState.timer, active: false, left: 0 };
+      if (navigator.vibrate) navigator.vibrate([200,100,200]);
+    } else { appState.timer.left -= 1; }
+    updateTimerUI();
+  }, 1000);
+  updateTimerUI();
+}
+function stopTimer() {
+  clearInterval(timerInterval);
+  appState.timer = { active: false, left: 0, label: "", total: 0 };
+  updateTimerUI();
+}
+function togglePause() {
+  if (appState.timer.active) {
+    clearInterval(timerInterval); appState.timer.active = false;
+  } else {
+    appState.timer.active = true;
+    timerInterval = setInterval(() => {
+      if (appState.timer.left <= 1) {
+        clearInterval(timerInterval);
+        appState.timer = { ...appState.timer, active: false, left: 0 };
+        if (navigator.vibrate) navigator.vibrate([200,100,200]);
+      } else { appState.timer.left -= 1; }
+      updateTimerUI();
+    }, 1000);
+  }
+  updateTimerUI();
+}
+function updateTimerUI() {
+  const bar = document.getElementById("timer-bar");
+  if (!bar) return;
+  const t = appState.timer;
+  const dayData = buildDay(DAYS_ORDER[appState.day], appState.week);
+  if (!t.active && t.left === 0 && t.total === 0) { bar.style.display = "none"; return; }
+  bar.style.display = "block";
+  bar.style.background = t.left === 0 ? "#30D158" : "#1C1C1E";
+  bar.style.borderTop = `2px solid ${t.left === 0 ? "#30D158" : dayData.color}`;
+  const timeEl = bar.querySelector(".timer-time");
+  const labelEl = bar.querySelector(".timer-label");
+  const pauseBtn = bar.querySelector(".timer-pause");
+  const prog = bar.querySelector(".timer-progress");
+  if (timeEl) { timeEl.textContent = t.left === 0 ? "C'est parti 🚀" : fmt(t.left); timeEl.style.color = t.left===0?"#fff":dayData.color; }
+  if (labelEl) labelEl.textContent = "⏱ " + t.label;
+  if (pauseBtn) { pauseBtn.textContent = t.active ? "⏸" : "▶️"; pauseBtn.style.display = t.left>0?"block":"none"; }
+  if (prog && t.total > 0) prog.style.width = `${(t.left/t.total)*100}%`;
+}
+
+// ── GLOBAL FUNCTIONS (called from HTML onclick) ────────────────────────────────
+window.vtaper = {
+  startTimer, stopTimer, togglePause,
+  setData,
+  goHome: () => {
+    appState.screen = "home";
+    appState.currentProfile = null;
+    appState.isOwner = false;
+    appState.workoutData = {};
+    renderHome();
+  },
+  setWeek: (w) => { appState.week = w; renderWorkoutScreen(); },
+  setDay: (d) => { appState.day = d; renderWorkoutContent(); },
+  goOverview: () => { appState.screen = "overview"; renderOverview(); },
+  goWorkout: () => { appState.screen = "workout"; renderWorkoutScreen(); },
+  overviewGoWeek: (w) => { appState.week = w; appState.screen = "workout"; renderWorkoutScreen(); },
+};
+
+// ── HOME SCREEN ───────────────────────────────────────────────────────────────
+async function renderHome() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div style="padding:max(env(safe-area-inset-top,48px),48px) 16px 12px;border-bottom:1px solid #1E1E20;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:11px;color:#8E8E93">💪 Programme 12 Semaines</div>
+        <div style="font-size:24px;font-weight:700;letter-spacing:-0.5px">V-Taper</div>
+      </div>
+      <button onclick="showCreateModal()" style="background:#4ECDC420;border:1px solid #4ECDC4;border-radius:12px;padding:8px 14px;color:#4ECDC4;font-size:13px;font-weight:700">+ Profil</button>
+    </div>
+    <div id="home-screen" style="flex:1;overflow-y:auto;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><div class="spinner"></div></div>
+    </div>
+    <div id="modal-container"></div>
+  `;
+
+  // Load profiles
+  try {
+    appState.profiles = await loadProfiles();
+    renderProfileList();
+  } catch(e) {
+    document.getElementById("home-screen").innerHTML = `<div style="text-align:center;color:#8E8E93;padding:40px 0">Erreur de connexion 😕<br><br><button onclick="renderHome()" style="background:#2C2C2E;border:none;border-radius:10px;padding:10px 16px;color:#F2F2F7;font-size:14px">Réessayer</button></div>`;
+  }
+}
+
+function renderProfileList() {
+  const container = document.getElementById("home-screen");
+  if (!container) return;
+  const myId = getMyProfileId();
+
+  if (appState.profiles.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:60px 20px">
+        <div style="font-size:48px;margin-bottom:16px">💪</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">Personne encore !</div>
+        <div style="font-size:13px;color:#8E8E93;margin-bottom:24px">Sois le premier à créer ton profil</div>
+        <button onclick="showCreateModal()" style="background:#4ECDC4;border:none;border-radius:14px;padding:12px 24px;color:#111113;font-size:15px;font-weight:700">Créer mon profil</button>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="font-size:11px;color:#8E8E93;font-weight:700;letter-spacing:0.8px;margin-bottom:12px">MEMBRES DU GROUPE</div>
+    ${appState.profiles.map(p => {
+      const isMe = p.id === myId;
+      const ph = getPhase(1);
+      return `
+        <div class="profile-card" onclick="openProfile('${p.id}')">
+          <div class="avatar" style="background:${PHASES[0].color}20">${p.emoji}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-size:16px;font-weight:700">${p.name}</div>
+              ${isMe ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:#4ECDC420;color:#4ECDC4">MON PROFIL</span>` : ''}
+            </div>
+            <div style="font-size:12px;color:#8E8E93;margin-top:2px">Appuie pour voir la progression</div>
+          </div>
+          <div style="font-size:20px">›</div>
+        </div>`;
+    }).join("")}
+  `;
+}
+
+window.openProfile = async (profileId) => {
+  const app = document.getElementById("app");
+  app.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div>`;
+
+  const profile = appState.profiles.find(p => p.id === profileId);
+  const mySecret = getMySecretKey();
+  const isOwner = profile.secretKey === mySecret;
+
+  appState.currentProfile = profile;
+  appState.isOwner = isOwner;
+  appState.week = 1;
+  appState.day = 0;
+  appState.screen = "workout";
+
+  try {
+    appState.workoutData = await loadWorkoutData(profileId);
+  } catch(e) { appState.workoutData = {}; }
+
+  renderWorkoutScreen();
+};
+
+// ── CREATE MODAL ──────────────────────────────────────────────────────────────
+window.showCreateModal = () => {
+  const myId = getMyProfileId();
+  if (myId && appState.profiles.find(p => p.id === myId)) {
+    // Already has profile, just open it
+    openProfile(myId);
+    return;
+  }
+  const container = document.getElementById("modal-container");
+  if (!container) return;
+  let selectedEmoji = EMOJIS[0];
+  container.innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px">Créer mon profil</div>
+        <div style="font-size:13px;color:#8E8E93;margin-bottom:20px">Ton profil sera visible par tout le groupe</div>
+        
+        <div style="font-size:12px;color:#8E8E93;margin-bottom:8px;font-weight:600">CHOISIS TON EMOJI</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="emoji-grid">
+          ${EMOJIS.map(e => `
+            <button onclick="selectEmoji('${e}',this)" style="width:44px;height:44px;border-radius:12px;border:2px solid ${e===selectedEmoji?'#4ECDC4':'#2C2C2E'};background:${e===selectedEmoji?'#4ECDC420':'#2C2C2E'};font-size:22px;transition:all 0.15s">${e}</button>
+          `).join("")}
+        </div>
+
+        <input class="modal-input" id="profile-name-input" placeholder="Ton prénom (ex: Jean)" maxlength="20" />
+        <button class="btn-primary" id="create-btn" style="background:#4ECDC4;color:#111113" onclick="submitCreateProfile()">Créer mon profil 💪</button>
+        <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+      </div>
+    </div>`;
+};
+
+window.selectEmoji = (emoji, btn) => {
+  window._selectedEmoji = emoji;
+  document.querySelectorAll("#emoji-grid button").forEach(b => {
+    b.style.borderColor = "#2C2C2E"; b.style.background = "#2C2C2E";
+  });
+  btn.style.borderColor = "#4ECDC4"; btn.style.background = "#4ECDC420";
+};
+window._selectedEmoji = EMOJIS[0];
+
+window.closeModal = (e) => {
+  if (e && e.target !== e.currentTarget) return;
+  const c = document.getElementById("modal-container");
+  if (c) c.innerHTML = "";
+};
+
+window.submitCreateProfile = async () => {
+  const name = document.getElementById("profile-name-input")?.value.trim();
+  if (!name) { document.getElementById("profile-name-input").style.borderColor = "#FF6B35"; return; }
+  const btn = document.getElementById("create-btn");
+  btn.textContent = "Création..."; btn.disabled = true;
+  try {
+    const profile = await createProfile(name, window._selectedEmoji || EMOJIS[0]);
+    appState.profiles.push(profile);
+    closeModal();
+    await openProfile(profile.id);
+  } catch(e) {
+    btn.textContent = "Erreur, réessaie"; btn.disabled = false;
+  }
+};
+
+// ── WORKOUT SCREEN ────────────────────────────────────────────────────────────
+function renderWorkoutScreen() {
+  const app = document.getElementById("app");
+  const week = appState.week;
+  const phase = getPhase(week);
+  const p = appState.currentProfile;
+
+  const totalExos = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.length, 0);
+  const doneExos = DAYS_ORDER.reduce((a,d) => a + buildDay(d,week).exercises.filter(e => getData(sk(week,d,e.id,"done"))).length, 0);
+  const weekPct = Math.round((doneExos/totalExos)*100);
+
+  app.innerHTML = `
+    <div id="top-fixed">
+      <div class="header">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button onclick="vtaper.goHome()" style="background:#2C2C2E;border:none;border-radius:10px;width:32px;height:32px;color:#F2F2F7;font-size:16px;display:flex;align-items:center;justify-content:center">‹</button>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:18px">${p.emoji}</span>
+                <span style="font-size:17px;font-weight:700">${p.name}</span>
+                ${!appState.isOwner ? `<span class="readonly-badge">👁 Lecture</span>` : ''}
+              </div>
+              <div style="font-size:12px;color:${phase.color};font-weight:600">S${week} · ${phase.label}</div>
+            </div>
+          </div>
+          <button onclick="vtaper.goOverview()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 12px;color:#F2F2F7;font-size:12px;font-weight:600">📊 12S</button>
+        </div>
+        <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:4px">
+          ${Array.from({length:12},(_,i)=>i+1).map(w => {
+            const ph = getPhase(w);
+            const active = w === week;
+            return `<button class="week-btn" onclick="vtaper.setWeek(${w})" style="background:${active?ph.color+'30':'#2C2C2E'};border-color:${active?ph.color:'transparent'};color:${active?ph.color:'#8E8E93'}">${w}</button>`;
+          }).join("")}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <div class="progress-bar-wrap"><div class="progress-bar" style="width:${weekPct}%;background:${phase.color}"></div></div>
+          <span style="font-size:11px;color:#8E8E93">${weekPct}% semaine</span>
+        </div>
+      </div>
+      <div class="day-tabs" id="day-tabs"></div>
+    </div>
+    <div id="scroll-content" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>
+    <div class="timer-bar" id="timer-bar" style="display:none;background:#1C1C1E;border-top:2px solid #FF6B35">
+      <div style="height:3px;background:#2C2C2E"><div class="timer-progress" style="height:100%;background:#FF6B35;transition:width 1s linear;width:100%"></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
+        <div>
+          <div class="timer-label" style="font-size:10px;color:#8E8E93;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⏱</div>
+          <div class="timer-time" style="font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1">0:00</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="timer-pause" onclick="vtaper.togglePause()" style="background:#2C2C2E;border:none;border-radius:10px;padding:10px 14px;color:#F2F2F7;font-size:18px">⏸</button>
+          <button onclick="vtaper.stopTimer()" style="background:#2C2C2E;border:none;border-radius:10px;padding:10px 14px;color:#F2F2F7;font-size:18px">✕</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  renderWorkoutContent();
+  updateTimerUI();
+}
+
+function renderWorkoutContent() {
+  const week = appState.week;
+  const dayKey = DAYS_ORDER[appState.day];
+  const dayData = buildDay(dayKey, week);
+  const phase = getPhase(week);
+  const isOwner = appState.isOwner;
+
+  // Day tabs
+  const tabsEl = document.getElementById("day-tabs");
+  if (tabsEl) {
+    tabsEl.innerHTML = DAYS_ORDER.map((dk, i) => {
+      const dd = buildDay(dk, week);
+      const done = dd.exercises.filter(e => getData(sk(week,dk,e.id,"done"))).length;
+      const full = done === dd.exercises.length;
+      const active = i === appState.day;
+      return `<button class="day-tab" onclick="vtaper.setDay(${i})" style="background:${active?dd.color:'#2C2C2E'};color:${active?'#fff':full?'#30D158':'#8E8E93'}">${dd.emoji} ${dk} ${full?"✅":""}</button>`;
+    }).join("");
+  }
+
+  const checked = dayData.exercises.filter(e => getData(sk(week,dayKey,e.id,"done"))).length;
+  const pct = Math.round((checked/dayData.exercises.length)*100);
+
+  const scroll = document.getElementById("scroll-content");
+  if (!scroll) return;
+
+  scroll.innerHTML = `
+    <div style="padding:16px 16px 8px">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:20px;font-weight:700;color:${dayData.color}">${dayData.label}</div>
+        <div style="font-size:12px;color:#8E8E93">${dayData.sub}</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <div style="font-size:10px;color:#8E8E93">🔥 Gros exo = 1min30</div>
+        <div style="font-size:10px;color:#8E8E93">⚡ Petit exo = 45s</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%;background:${dayData.color}"></div></div>
+        <span style="font-size:11px;color:#8E8E93">${checked}/${dayData.exercises.length}</span>
+      </div>
+    </div>
+
+    <div style="padding:0 12px">
+      ${dayData.exercises.map(ex => {
+        const isDone = !!getData(sk(week,dayKey,ex.id,"done"));
+        const weight = getData(sk(week,dayKey,ex.id,"weight")) || "";
+        const notes = getData(sk(week,dayKey,ex.id,"notes")) || "";
+        const isBig = ex.type === "big";
+        const prevW = week > 1 ? getData(sk(week-1,dayKey,ex.id,"weight")) : null;
+        const safeId = ex.id.replace(/[^a-z0-9]/gi,"");
+        return `
+          <div class="exercise-card ${isDone?'done':''}">
+            <div style="display:flex;gap:12px">
+              ${isOwner ? `
+                <button class="checkbox-btn" onclick="vtaper.setData('${sk(week,dayKey,ex.id,'done')}',${!isDone})"
+                  style="border-color:${isDone?'#30D158':dayData.color};background:${isDone?'#30D158':'transparent'}">
+                  ${isDone?'<span style="color:#fff;font-size:14px">✓</span>':''}
+                </button>` : `
+                <div style="width:26px;height:26px;border-radius:13px;flex-shrink:0;border:2px solid ${isDone?'#30D158':'#3C3C3E'};background:${isDone?'#30D158':'transparent'};display:flex;align-items:center;justify-content:center">
+                  ${isDone?'<span style="color:#fff;font-size:14px">✓</span>':''}
+                </div>`}
+              <div style="flex:1">
+                <span style="font-size:9px;font-weight:800;letter-spacing:0.8px;color:${isBig?'#FF6B35':'#4ECDC4'};background:${isBig?'#FF6B3518':'#4ECDC418'};padding:2px 7px;border-radius:5px">
+                  ${isBig?'🔥 GROS EXO':'⚡ PETIT EXO'}
+                </span>
+                <div style="font-size:15px;font-weight:700;color:${isDone?'#8E8E93':'#F2F2F7'};text-decoration:${isDone?'line-through':'none'};margin-top:5px;line-height:1.3">${ex.name}</div>
+                <div style="font-size:13px;color:${dayData.color};font-weight:600;margin-top:3px">${ex.sets} séries × ${ex.reps} reps</div>
+                ${ex.note?`<div style="font-size:11px;color:#8E8E93;margin-top:4px;font-style:italic;line-height:1.4">💬 ${ex.note}</div>`:''}
+                ${prevW?`<div style="font-size:11px;color:#8E8E93;margin-top:4px">S${week-1} : <span style="color:#F59E0B;font-weight:700">${prevW} kg</span> → vise +2.5kg 🎯</div>`:''}
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+                  <div class="weight-input-wrap">
+                    <span style="font-size:13px">🏋️</span>
+                    <input type="number" inputmode="decimal" placeholder="${isOwner?'Ton poids (kg)':'—'}"
+                      value="${weight}"
+                      ${isOwner ? `onchange="vtaper.setData('${sk(week,dayKey,ex.id,'weight')}',this.value)"` : 'readonly'}
+                      class="weight-input"
+                      style="color:${weight?dayData.color:'#8E8E93'};font-weight:${weight?700:400}" />
+                    ${weight?`<span style="font-size:11px;color:#8E8E93">kg</span>`:''}
+                  </div>
+                  ${isOwner ? `
+                    <button onclick="vtaper.startTimer(${isBig?REST_BIG:REST_SMALL},'${ex.name.replace(/'/g,"")}')"
+                      style="background:${isBig?'#FF6B3520':'#4ECDC420'};border:1px solid ${isBig?'#FF6B35':'#4ECDC4'};border-radius:10px;padding:7px 12px;color:${isBig?'#FF6B35':'#4ECDC4'};font-size:12px;font-weight:700;white-space:nowrap">
+                      ⏱ ${isBig?'1:30':'0:45'}
+                    </button>` : ''}
+                </div>
+                <input type="text" placeholder="${isOwner?'Notes perso...':notes||'Pas de notes'}"
+                  value="${(notes||'').replace(/"/g,'&quot;')}"
+                  ${isOwner ? `oninput="vtaper.setData('${sk(week,dayKey,ex.id,'notes')}',this.value)"` : 'readonly'}
+                  class="notes-input"
+                  style="color:${notes?'#F59E0B':'#8E8E93'}" />
+              </div>
+            </div>
+          </div>`;
+      }).join("")}
+    </div>
+
+    <!-- COACH -->
+    <div style="padding:4px 12px 32px">
+      <div style="background:#1C1C1E;border-radius:16px;padding:14px 16px;border-left:3px solid ${phase.color}">
+        <div style="font-size:12px;font-weight:800;color:${phase.color};margin-bottom:8px;letter-spacing:0.5px">⚙️ COACH — ${phase.name}</div>
+        ${["🚶 10 000 pas / jour minimum","💤 8h de sommeil — Cortisol = gras sur les hanches","📵 Garde le rythme entre les séries, pas de scroll",
+          ...(week<=4?["🎯 Phase 1 : Maîtrise les mouvements avant d'augmenter"]:week<=8?["📈 Phase 2 : +2.5kg toutes les 1-2 semaines si possible"]:["🔥 Phase 3 : Drop sets = 1 série, puis -30% charge, à l'échec"])
+        ].map(t=>`<div style="font-size:12px;color:#8E8E93;margin-bottom:5px;line-height:1.5">${t}</div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+function renderOverview() {
+  const app = document.getElementById("app");
+  const p = appState.currentProfile;
+  app.innerHTML = `
+    <div style="flex-shrink:0;padding:max(env(safe-area-inset-top,48px),48px) 16px 16px;border-bottom:1px solid #2C2C2E;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="vtaper.goWorkout()" style="background:#2C2C2E;border:none;border-radius:10px;width:32px;height:32px;color:#F2F2F7;font-size:16px;display:flex;align-items:center;justify-content:center">‹</button>
+        <div>
+          <div style="font-size:13px;color:#8E8E93">${p.emoji} ${p.name} · 📊 Vue d'ensemble</div>
+          <div style="font-size:22px;font-weight:700">12 Semaines</div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding-bottom:32px">
+      ${PHASES.map(ph => `
+        <div style="padding:16px 16px 0">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:${ph.color};margin-bottom:6px">${ph.name} — ${ph.label}</div>
+          <div style="font-size:12px;color:#8E8E93;margin-bottom:10px;line-height:1.5">${ph.desc}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            ${ph.weeks.map(w => {
+              const tot = DAYS_ORDER.reduce((a,d) => a + buildDay(d,w).exercises.length, 0);
+              const done = DAYS_ORDER.reduce((a,d) => a + buildDay(d,w).exercises.filter(e => getData(sk(w,d,e.id,"done"))).length, 0);
+              const pct = Math.round((done/tot)*100);
+              const isCurrent = w === appState.week;
+              return `<button class="overview-week-btn" onclick="vtaper.overviewGoWeek(${w})"
+                style="width:72px;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;background:${isCurrent?ph.color:pct===100?'#1A3A1A':'#2C2C2E'};border:2px solid ${isCurrent?ph.color:pct===100?'#30D158':'transparent'}">
+                <div style="font-size:13px;font-weight:700;color:${isCurrent?'#fff':pct===100?'#30D158':'#F2F2F7'}">S${w}</div>
+                <div style="font-size:10px;color:${isCurrent?'rgba(255,255,255,0.7)':'#8E8E93'};margin-top:2px">${pct}%</div>
+                ${pct===100?'<div style="font-size:14px;margin-top:2px">✅</div>':''}
+              </button>`;
+            }).join("")}
+          </div>
+        </div>`).join("")}
+
+      <div style="margin:8px 16px 0;background:#2C2C2E;border-radius:14px;padding:14px 16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">📈 Progression globale</div>
+        ${PHASES.map(ph => {
+          const tot = ph.weeks.reduce((a,w) => a + DAYS_ORDER.reduce((b,d) => b + buildDay(d,w).exercises.length, 0), 0);
+          const done = ph.weeks.reduce((a,w) => a + DAYS_ORDER.reduce((b,d) => b + buildDay(d,w).exercises.filter(e => getData(sk(w,d,e.id,"done"))).length, 0), 0);
+          const pct = Math.round((done/tot)*100);
+          return `<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:#8E8E93">${ph.name}</span>
+              <span style="font-size:12px;color:${ph.color}">${pct}%</span>
+            </div>
+            <div style="height:4px;background:#1C1C1E;border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${ph.color};border-radius:2px"></div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+renderHome();
+
+// Service Worker
+if ("serviceWorker" in navigator) {
+  const sw = `self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))))`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:"application/javascript"}))).catch(()=>{});
+}
+</script>
+</body>
+</html>
