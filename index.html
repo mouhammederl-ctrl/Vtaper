@@ -635,7 +635,7 @@ function renderNutrition(){
         <div><div style="font-size:11px;color:#8E8E93">TDEE maintenance</div><div style="font-size:26px;font-weight:700;color:${gc}">${tdeeData.tdee} kcal</div></div>
         <div style="text-align:right"><div style="font-size:11px;color:#8E8E93">Cible ${GOAL_LABELS[goal]}</div><div style="font-size:20px;font-weight:700;color:${gc}">${targetCals} kcal</div></div>
       </div>
-      ${stepsBonus>0?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 10px;background:#30D15815;border-radius:8px;border:1px solid #30D15830"><span style="font-size:13px">🚶</span><span style="font-size:12px;color:#30D158;font-weight:600">+${stepsBonus} kcal ajoutés grâce à ${getTodaySteps().toLocaleString()} pas aujourd&#39;hui</span></div>`:""}
+      ${stepsBonus>0?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 10px;background:#30D15815;border-radius:8px;border:1px solid #30D15830"><span style="font-size:13px">🚶</span><span style="font-size:12px;color:#30D158;font-weight:600">+${stepsBonus} kcal ajoutés grâce à ${getTodaySteps().toLocaleString()} pas aujourd'hui</span></div>`:""}
       ${macros?`<div style="display:flex;gap:6px">
         <div class="macro-pill" style="background:#FF6B3520;color:#FF6B35"><div style="font-size:16px;font-weight:700">${macros.prot}g</div><div style="font-size:10px">Protéines</div></div>
         <div class="macro-pill" style="background:#4ECDC420;color:#4ECDC4"><div style="font-size:16px;font-weight:700">${macros.carb}g</div><div style="font-size:10px">Glucides</div></div>
@@ -813,7 +813,7 @@ function renderStats(){
         const best=allSteps.length?Math.max(...allSteps.map(x=>x.v)):0;
         const allWater=Object.entries(S.statsData.water||{}).map(([k,v])=>parseInt(v)||0).filter(x=>x>0);
         const avgWater=allWater.length?Math.round(allWater.reduce((a,b)=>a+b,0)/allWater.length*10)/10:0;
-        if(!allSteps.length)return`<div style="text-align:center;color:#8E8E93;font-size:13px;padding:10px 0">Saisis tes pas dans l&#39;onglet Séances</div>`;
+        if(!allSteps.length)return`<div style="text-align:center;color:#8E8E93;font-size:13px;padding:10px 0">Saisis tes pas dans l'onglet Séances pour voir l'analyse</div>`;
         const maxV=best||1;
         return`<div style="display:flex;gap:10px;margin-bottom:12px">
           <div style="flex:1;background:#30D15815;border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#30D158">${avg>=10000?"🎯":""}${(avg/1000).toFixed(1)}k</div><div style="font-size:10px;color:#8E8E93">Moy. pas/jour</div></div>
@@ -840,7 +840,7 @@ function renderStats(){
       ${avgSleep!==null?`<div style="display:flex;gap:10px;margin-bottom:10px">
         <div style="flex:1;background:${avgSleep>=7?"#30D15820":"#FF3B3020"};border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${avgSleep>=7?"#30D158":"#FF3B30"}">${avgSleep}h</div><div style="font-size:10px;color:#8E8E93">Moy. sommeil</div></div>
         <div style="flex:1;background:#4ECDC420;border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:#4ECDC4">${sleepEntries.length}</div><div style="font-size:10px;color:#8E8E93">Nuits enreg.</div></div>
-      </div>${buildSleepCorr()}`:`<div style="font-size:13px;color:#8E8E93;text-align:center;padding:10px 0">Enregistre ton sommeil 🌙</div>`}
+      </div>${buildSleepCorr()}`:`<div style="font-size:13px;color:#8E8E93;text-align:center;padding:10px 0">Enregistre ton sommeil pour voir l'analyse 🌙</div>`}
     </div>
 
     <!-- Progression 12 semaines -->
@@ -911,15 +911,7 @@ function openFoodSearch(){
     <div class="modal-body" id="fresults">
       <div style="text-align:center;color:#8E8E93;padding:12px 0 4px;font-size:12px">Recherche dans USDA + Open Food Facts</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px">
-        <button onclick="document.getElementById('fsearch').value='Poulet';G.doFoodSearch('Poulet')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Poulet</button>
-        <button onclick="document.getElementById('fsearch').value='Riz';G.doFoodSearch('Riz')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Riz</button>
-        <button onclick="document.getElementById('fsearch').value='Oeuf';G.doFoodSearch('Oeuf')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Oeuf</button>
-        <button onclick="document.getElementById('fsearch').value='Fromage blanc';G.doFoodSearch('Fromage blanc')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Fromage blanc</button>
-        <button onclick="document.getElementById('fsearch').value='Avoine';G.doFoodSearch('Avoine')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Avoine</button>
-        <button onclick="document.getElementById('fsearch').value='Saumon';G.doFoodSearch('Saumon')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Saumon</button>
-        <button onclick="document.getElementById('fsearch').value='Boeuf';G.doFoodSearch('Boeuf')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Boeuf</button>
-        <button onclick="document.getElementById('fsearch').value='Banane';G.doFoodSearch('Banane')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Banane</button>
-        <button onclick="document.getElementById('fsearch').value='Pain';G.doFoodSearch('Pain')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600">Pain</button>
+        ${["Poulet","Riz","Oeuf","Fromage blanc","Avoine","Saumon","Boeuf","Banane","Pain"].map(s=>`<button onclick="document.getElementById('fsearch').value='${s}';G.doFoodSearch('${s}')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600;cursor:pointer">${s}</button>`).join("")}
       </div>
     </div>
   </div></div>`;
