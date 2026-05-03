@@ -86,8 +86,8 @@ select{background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2
 <body>
 <div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
 <script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import{getFirestore,doc,getDoc,setDoc,deleteDoc,collection,getDocs,serverTimestamp}from"https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+import{getFirestore,doc,getDoc,setDoc,deleteDoc,collection,getDocs,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 const db=getFirestore(initializeApp({apiKey:"AIzaSyBkyLiSPr62Mel-dMihaGPkYb8A6_lLO9g",authDomain:"v-taper.firebaseapp.com",projectId:"v-taper",storageBucket:"v-taper.firebasestorage.app",messagingSenderId:"937594998941",appId:"1:937594998941:web:15ad773450290bc81a4474"}));
 
 /* ── EXERCISE LIBRARY ── */
@@ -216,7 +216,7 @@ const S={
   statsExFilter:null, // libId for long-term chart
   timer:{active:false,left:0,label:"",total:0},
 };
-let timerInt=null,saveTmr=null,nutTmr=null,statsTmr=null,foodTmr=null;
+let timerInt=null,saveTmr=null,nutTmr=null,statsTmr=null,foodTmr=null,foodSearchTimer=null;
 
 /* ── AUTH ── */
 function getSecret(){let k=localStorage.getItem("vtaper_secret");if(!k){k=crypto.randomUUID();localStorage.setItem("vtaper_secret",k);}return k;}
@@ -240,10 +240,9 @@ async function deleteProfile(pid){
   await Promise.all([deleteDoc(doc(db,"profiles",pid)),deleteDoc(doc(db,"workoutData",pid)),deleteDoc(doc(db,"nutritionData",pid)),deleteDoc(doc(db,"statsData",pid))]);
   localStorage.removeItem("vtaper_pid");
 }
-const sched=(fn,ref,ms=1000)=>{clearTimeout(ref[0]);ref[0]=setTimeout(fn,ms);};
-const saveSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveWD(S.currentProfile.id,S.workoutData);}catch(e){}},{0:saveTmr});
-const nutSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveND(S.currentProfile.id,S.nutritionData);}catch(e){}},{0:nutTmr});
-const statsSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveSD(S.currentProfile.id,S.statsData);}catch(e){}},{0:statsTmr});
+const saveSched=()=>{clearTimeout(saveTmr);saveTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveWD(S.currentProfile.id,S.workoutData);}catch(e){}},1000);};
+const nutSched=()=>{clearTimeout(nutTmr);nutTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveND(S.currentProfile.id,S.nutritionData);}catch(e){}},1000);};
+const statsSched=()=>{clearTimeout(statsTmr);statsTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveSD(S.currentProfile.id,S.statsData);}catch(e){}},1000);};
 
 /* ── DATA HELPERS ── */
 function getDayExs(day){return(S.workoutData.days[day]||{exercises:[]}).exercises;}
@@ -824,7 +823,6 @@ function openManualFood(){
 /* ════════════════════════════════════════════
    GLOBAL HANDLERS
 ════════════════════════════════════════════ */
-let foodSearchTimer=null;
 window.G={
   startTimer,stopTimer,togglePause,
   setTab(id){S.tab=id;updateNav();if(id==="home")renderHome();else if(id==="workout")renderWorkout();else if(id==="nutrition")renderNutrition();else if(id==="stats")renderStats();},
