@@ -77,11 +77,6 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 /* STATS */
 .stat-ex-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #1E1E20}
 .profile-card{display:flex;align-items:center;gap:14px;background:#1C1C1E;border-radius:16px;padding:14px 16px;margin-bottom:10px;border:1px solid #2C2C2E;cursor:pointer}
-/* STEPS + WATER */
-.steps-bar{height:6px;background:#2C2C2E;border-radius:3px;overflow:hidden;margin-top:5px}
-.steps-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
-.water-drop{font-size:20px;cursor:pointer;transition:transform 0.15s;display:inline-block;line-height:1}
-.water-drop:active{transform:scale(0.82)}
 
 .spinner{width:28px;height:28px;border:3px solid #2C2C2E;border-top-color:#4ECDC4;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -91,8 +86,8 @@ select{background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2
 <body>
 <div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
 <script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import{getFirestore,doc,getDoc,setDoc,deleteDoc,collection,getDocs,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import{initializeApp}from"https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import{getFirestore,doc,getDoc,setDoc,deleteDoc,collection,getDocs,serverTimestamp}from"https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 const db=getFirestore(initializeApp({apiKey:"AIzaSyBkyLiSPr62Mel-dMihaGPkYb8A6_lLO9g",authDomain:"v-taper.firebaseapp.com",projectId:"v-taper",storageBucket:"v-taper.firebasestorage.app",messagingSenderId:"937594998941",appId:"1:937594998941:web:15ad773450290bc81a4474"}));
 
 /* ── EXERCISE LIBRARY ── */
@@ -215,13 +210,13 @@ const S={
   week:1,day:0,
   workoutData:{days:{},logs:{}},
   nutritionData:{profile:{},foodLog:{}},
-  statsData:{sleep:{},steps:{},water:{}},
+  statsData:{sleep:{}},
   libFilter:null,_libDay:null,
   foodSearch:"",foodResults:[],foodLoading:false,
   statsExFilter:null, // libId for long-term chart
   timer:{active:false,left:0,label:"",total:0},
 };
-let timerInt=null,saveTmr=null,nutTmr=null,statsTmr=null,foodTmr=null,foodSearchTimer=null;
+let timerInt=null,saveTmr=null,nutTmr=null,statsTmr=null,foodTmr=null;
 
 /* ── AUTH ── */
 function getSecret(){let k=localStorage.getItem("vtaper_secret");if(!k){k=crypto.randomUUID();localStorage.setItem("vtaper_secret",k);}return k;}
@@ -245,9 +240,10 @@ async function deleteProfile(pid){
   await Promise.all([deleteDoc(doc(db,"profiles",pid)),deleteDoc(doc(db,"workoutData",pid)),deleteDoc(doc(db,"nutritionData",pid)),deleteDoc(doc(db,"statsData",pid))]);
   localStorage.removeItem("vtaper_pid");
 }
-const saveSched=()=>{clearTimeout(saveTmr);saveTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveWD(S.currentProfile.id,S.workoutData);}catch(e){}},1000);};
-const nutSched=()=>{clearTimeout(nutTmr);nutTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveND(S.currentProfile.id,S.nutritionData);}catch(e){}},1000);};
-const statsSched=()=>{clearTimeout(statsTmr);statsTmr=setTimeout(async()=>{if(S.isOwner&&S.currentProfile)try{await saveSD(S.currentProfile.id,S.statsData);}catch(e){}},1000);};
+const sched=(fn,ref,ms=1000)=>{clearTimeout(ref[0]);ref[0]=setTimeout(fn,ms);};
+const saveSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveWD(S.currentProfile.id,S.workoutData);}catch(e){}},{0:saveTmr});
+const nutSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveND(S.currentProfile.id,S.nutritionData);}catch(e){}},{0:nutTmr});
+const statsSched=()=>sched(async()=>{if(S.isOwner&&S.currentProfile)try{await saveSD(S.currentProfile.id,S.statsData);}catch(e){}},{0:statsTmr});
 
 /* ── DATA HELPERS ── */
 function getDayExs(day){return(S.workoutData.days[day]||{exercises:[]}).exercises;}
@@ -257,19 +253,6 @@ function setLog(k,v){S.workoutData.logs[k]=v;saveSched();}
 function lk(w,d,ei,si,f){return`w${w}_${d}_${ei}_s${si}_${f}`;}
 function todayKey(){return new Date().toISOString().slice(0,10);}
 function isDoneEx(week,day,ei){return!!getLog(lk(week,day,ei,0,"done"));}
-
-/* ── STEPS & WATER ── */
-function stepsKey(){return"s_"+todayKey();}
-function waterKey(){return"w_"+todayKey();}
-function getTodaySteps(){return parseInt(S.statsData.steps[stepsKey()]||0);}
-function setTodaySteps(v){S.statsData.steps[stepsKey()]=parseInt(v)||0;statsSched();}
-function getTodayWater(){return parseInt(S.statsData.water[waterKey()]||0);}
-function setTodayWater(v){S.statsData.water[waterKey()]=Math.max(0,parseInt(v)||0);statsSched();}
-/* Steps bonus: +50 kcal per 2000 steps above 3000 baseline (max +250 kcal at 13000 steps) */
-function stepsKcalBonus(steps){
-  if(!steps||steps<3000)return 0;
-  return Math.min(250,Math.round(((steps-3000)/2000)*50));
-}
 
 /* ── VOLUME ── */
 function calcVol(week,day){
@@ -282,12 +265,12 @@ function maxWeightEx(week,day,ei,sets){
 }
 
 /* ── NUTRITION ── */
-function calcTDEE(p,extraKcal=0){
+function calcTDEE(p){
   if(!p.weight||!p.height||!p.age||!p.sex)return null;
   const bmr=p.sex==="H"?(10*p.weight)+(6.25*p.height)-(5*p.age)+5:(10*p.weight)+(6.25*p.height)-(5*p.age)-161;
   const f={sedentaire:1.2,leger:1.375,modere:1.55,actif:1.725,tres_actif:1.9};
-  const tdee=Math.round(bmr*(f[p.activity]||1.375))+extraKcal;
-  return{bmr:Math.round(bmr),tdee,stepsBonus:extraKcal,targets:{seche:Math.round(tdee*0.8),maintien:tdee,bulk:Math.round(tdee*1.15)}};
+  const tdee=Math.round(bmr*(f[p.activity]||1.375));
+  return{bmr:Math.round(bmr),tdee,targets:{seche:Math.round(tdee*0.8),maintien:tdee,bulk:Math.round(tdee*1.15)}};
 }
 function calcMacros(kcal){
   const np=S.nutritionData.profile;
@@ -297,55 +280,18 @@ function calcMacros(kcal){
   return{prot,fat,carb};
 }
 async function searchFood(q){
-  const results=[];
-  const seen=new Set();
-  const add=(name,kcal,prot,carb,fat,src)=>{
-    if(!name||seen.has(name.toLowerCase().slice(0,20)))return;
-    if(!kcal&&!prot&&!carb&&!fat)return;
-    seen.add(name.toLowerCase().slice(0,20));
-    results.push({name,kcal:Math.round(kcal||0),prot:Math.round(prot||0),carb:Math.round(carb||0),fat:Math.round(fat||0),source:src});
-  };
-
-  // ── Source 1 : USDA FoodData Central (no key needed for foundation foods) ──
   try{
-    const r1=await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&dataType=Foundation,SR%20Legacy,Branded&pageSize=8&api_key=DEMO_KEY`);
-    const d1=await r1.json();
-    (d1.foods||[]).forEach(f=>{
-      const nutr=(id)=>(f.foodNutrients||[]).find(n=>n.nutrientId===id)?.value||0;
-      add(f.description,nutr(1008),nutr(1003),nutr(1005),nutr(1004),"usda");
-    });
-  }catch(e){}
-
-  // ── Source 2 : Open Food Facts (global products, barcodes) ──
-  try{
-    const r2=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments&lc=fr`);
-    const d2=await r2.json();
-    (d2.products||[]).filter(p=>p.product_name&&p.nutriments).forEach(p=>{
-      const n=p.nutriments;
-      add(p.product_name,
-        n["energy-kcal_100g"]||n["energy-kcal"]||0,
-        n.proteins_100g||0,n.carbohydrates_100g||0,n.fat_100g||0,"off");
-    });
-  }catch(e){}
-
-  // ── Source 3 : Nutritionix (large FR/EN database fallback) ──
-  if(results.length<4){
-    try{
-      const r3=await fetch(`https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(q)}&detailed=true`,
-        {headers:{"x-app-id":"43df7416","x-app-key":"8d4ae6dd1f4de9fff98e9ea1b2b7d4e5"}});
-      const d3=await r3.json();
-      ([...(d3.common||[]),...(d3.branded||[])].slice(0,6)).forEach(f=>{
-        const n=f.full_nutrients||[];
-        const nv=(id)=>(n.find(x=>x.attr_id===id)||{value:0}).value;
-        const kcal=nv(208)||f.nf_calories||0;
-        const srv=f.serving_weight_grams||100;
-        const scale=100/srv;
-        add(f.food_name||(f.brand_name+" "+f.item_name),kcal*scale,nv(203)*scale,nv(205)*scale,nv(204)*scale,"nix");
-      });
-    }catch(e){}
-  }
-
-  return results.slice(0,10);
+    const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,nutriments`);
+    const d=await r.json();
+    return(d.products||[]).filter(p=>p.product_name&&p.nutriments).map(p=>({
+      name:p.product_name,
+      kcal:Math.round(p.nutriments["energy-kcal_100g"]||p.nutriments["energy-kcal"]||0),
+      prot:Math.round((p.nutriments.proteins_100g)||0),
+      carb:Math.round((p.nutriments.carbohydrates_100g)||0),
+      fat:Math.round((p.nutriments.fat_100g)||0),
+      source:"off"
+    }));
+  }catch(e){return[];}
 }
 
 /* ── TIMER ── */
@@ -495,43 +441,12 @@ function renderWorkout(){
 function renderWorkoutContent(){
   const week=S.week;const day=DAYS[S.day];const exs=getDayExs(day);const st=ST[detectST(exs)];
   const tabs=document.getElementById("day-tabs");
-  if(tabs)tabs.innerHTML=DAYS.map((d,i)=>{const dst=ST[detectST(getDayExs(d))];const dn=getDayExs(d).filter((_,j)=>isDoneEx(S.week,d,j)).length;const full=getDayExs(d).length>0&&dn===getDayExs(d).length;const active=i===S.day;return`<button class="day-tab" onclick="G.setDay(${i})" style="background:${active?dst.color:"#2C2C2E"};color:${active?"#fff":full?"#30D158":"#8E8E93"}"><span style="font-size:12px">${dst.emoji}</span><span style="font-size:10px;font-weight:700">${d}</span>${full?'<span style="font-size:8px">✅</span>':""}</button>`;}).join("");
+  if(tabs)tabs.innerHTML=DAYS.map((d,i)=>{const dst=ST[detectST(getDayExs(d))];const dn=getDayExs(d).filter((_,j)=>isDoneEx(S.week,d,j)).length;const full=getDayExs(d).length>0&&dn===getDayExs(d).length;const active=i===S.day;return`<button class="day-tab" onclick="G.setDay(${i})" style="background:${active?dst.color:"#2C2C2E"};color:${active?"#fff":full?"#30D158":"#8E8E93'}"><span style="font-size:12px">${dst.emoji}</span><span style="font-size:10px;font-weight:700">${d}</span>${full?'<span style="font-size:8px">✅</span>':""}</button>`;}).join("");
   const done=exs.filter((_,i)=>isDoneEx(week,day,i)).length;
   const pct=exs.length>0?Math.round((done/exs.length)*100):0;
   const vol=calcVol(week,day);
   const sc=document.getElementById("scroll-content");if(!sc)return;
-  const todaySteps=getTodaySteps();const todayWater=getTodayWater();
-  const stepsBonus=stepsKcalBonus(todaySteps);const stepsGoal=10000;
-  const stepsColor=todaySteps>=stepsGoal?"#30D158":todaySteps>=6000?"#F59E0B":"#8E8E93";
-  const waterGoal=8;const waterColor=todayWater>=waterGoal?"#4ECDC4":todayWater>=5?"#60C4FF":"#8E8E93";
   sc.innerHTML=`
-    <!-- STEPS + WATER STRIP -->
-    ${S.isOwner?`<div style="margin:8px 12px 0;display:flex;gap:8px">
-      <!-- Steps -->
-      <div style="flex:1;background:#1C1C1E;border-radius:12px;padding:10px 12px;border:1px solid #2C2C2E">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:11px;font-weight:700;color:#8E8E93">🚶 PAS DU JOUR</span>
-          ${stepsBonus>0?`<span style="font-size:10px;font-weight:700;color:#30D158">+${stepsBonus} kcal</span>`:""}
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <input type="number" inputmode="numeric" placeholder="0" value="${todaySteps||""}"
-            onchange="G.saveSteps(this.value)"
-            style="flex:1;background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:${stepsColor};font-size:15px;font-weight:700;text-align:center;padding:5px 4px;outline:none;-webkit-appearance:none"/>
-          <span style="font-size:11px;color:#8E8E93;white-space:nowrap">/ ${(stepsGoal/1000).toFixed(0)}k</span>
-        </div>
-        <div class="steps-bar"><div class="steps-fill" style="width:${Math.min(100,(todaySteps/stepsGoal)*100)}%;background:${stepsColor}"></div></div>
-      </div>
-      <!-- Water -->
-      <div style="background:#1C1C1E;border-radius:12px;padding:10px 12px;border:1px solid #2C2C2E;min-width:110px">
-        <div style="font-size:11px;font-weight:700;color:#8E8E93;margin-bottom:4px">💧 EAU</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-          <button onclick="G.addWater(-1)" style="background:#2C2C2E;border:none;border-radius:7px;width:26px;height:26px;color:#F2F2F7;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">−</button>
-          <span style="font-size:16px;font-weight:700;color:${waterColor};min-width:24px;text-align:center">${todayWater}</span>
-          <button onclick="G.addWater(1)" style="background:#2C2C2E;border:none;border-radius:7px;width:26px;height:26px;color:#F2F2F7;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">+</button>
-        </div>
-        <div style="font-size:10px;color:#8E8E93;text-align:center">${todayWater}/${waterGoal} verres</div>
-      </div>
-    </div>`:""}
     <div style="padding:10px 16px 6px;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">${st.emoji}</span><div><div style="font-size:16px;font-weight:700;color:${st.color}">${st.label}</div><div style="font-size:11px;color:#8E8E93">${st.sub}</div></div></div>
       <div style="text-align:right"><div style="font-size:11px;color:#8E8E93">${done}/${exs.length} · <span style="color:${st.color};font-weight:700">${vol?vol+"kg vol":""}</span></div><div style="width:60px;height:4px;background:#2C2C2E;border-radius:2px;overflow:hidden;margin-top:3px"><div style="height:100%;width:${pct}%;background:${st.color};border-radius:2px"></div></div></div>
@@ -593,8 +508,7 @@ function renderNutrition(){
   if(!S.currentProfile){setTopBar("Nutrition","🥗");document.getElementById("main-content").innerHTML=noProfileMsg();return;}
   const p=S.currentProfile;const np=S.nutritionData.profile||{};
   const goal=np.goal||"maintien";const gc=GOAL_COLORS[goal];
-  const stepsBonus=stepsKcalBonus(getTodaySteps());
-  const tdeeData=calcTDEE(np,stepsBonus);const targetCals=tdeeData?tdeeData.targets[goal]:null;const macros=targetCals?calcMacros(targetCals):null;
+  const tdeeData=calcTDEE(np);const targetCals=tdeeData?tdeeData.targets[goal]:null;const macros=targetCals?calcMacros(targetCals):null;
   const today=todayKey();const todayLog=S.nutritionData.foodLog[today]||[];
   const totKcal=todayLog.reduce((a,f)=>a+((f.kcal||0)*(f.grams||100)/100),0);
   const totProt=todayLog.reduce((a,f)=>a+((f.prot||0)*(f.grams||100)/100),0);
@@ -635,7 +549,6 @@ function renderNutrition(){
         <div><div style="font-size:11px;color:#8E8E93">TDEE maintenance</div><div style="font-size:26px;font-weight:700;color:${gc}">${tdeeData.tdee} kcal</div></div>
         <div style="text-align:right"><div style="font-size:11px;color:#8E8E93">Cible ${GOAL_LABELS[goal]}</div><div style="font-size:20px;font-weight:700;color:${gc}">${targetCals} kcal</div></div>
       </div>
-      ${stepsBonus>0?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 10px;background:#30D15815;border-radius:8px;border:1px solid #30D15830"><span style="font-size:13px">🚶</span><span style="font-size:12px;color:#30D158;font-weight:600">+${stepsBonus} kcal ajoutés grâce à ${getTodaySteps().toLocaleString()} pas aujourd'hui</span></div>`:""}
       ${macros?`<div style="display:flex;gap:6px">
         <div class="macro-pill" style="background:#FF6B3520;color:#FF6B35"><div style="font-size:16px;font-weight:700">${macros.prot}g</div><div style="font-size:10px">Protéines</div></div>
         <div class="macro-pill" style="background:#4ECDC420;color:#4ECDC4"><div style="font-size:16px;font-weight:700">${macros.carb}g</div><div style="font-size:10px">Glucides</div></div>
@@ -804,29 +717,6 @@ function renderStats(){
       }).join("")}
     </div>`:""}
 
-    <!-- Steps stats -->
-    <div style="font-size:11px;color:#8E8E93;font-weight:700;letter-spacing:.6px;margin-bottom:8px">PAS & HYDRATATION</div>
-    <div class="card" style="margin-bottom:14px">
-      ${(()=>{
-        const allSteps=Object.entries(S.statsData.steps||{}).map(([k,v])=>({date:k.replace("s_",""),v:parseInt(v)||0})).filter(x=>x.v>0).sort((a,b)=>a.date<b.date?1:-1).slice(0,14);
-        const avg=allSteps.length?Math.round(allSteps.reduce((a,x)=>a+x.v,0)/allSteps.length):0;
-        const best=allSteps.length?Math.max(...allSteps.map(x=>x.v)):0;
-        const allWater=Object.entries(S.statsData.water||{}).map(([k,v])=>parseInt(v)||0).filter(x=>x>0);
-        const avgWater=allWater.length?Math.round(allWater.reduce((a,b)=>a+b,0)/allWater.length*10)/10:0;
-        if(!allSteps.length)return`<div style="text-align:center;color:#8E8E93;font-size:13px;padding:10px 0">Saisis tes pas dans l'onglet Séances pour voir l'analyse</div>`;
-        const maxV=best||1;
-        return`<div style="display:flex;gap:10px;margin-bottom:12px">
-          <div style="flex:1;background:#30D15815;border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#30D158">${avg>=10000?"🎯":""}${(avg/1000).toFixed(1)}k</div><div style="font-size:10px;color:#8E8E93">Moy. pas/jour</div></div>
-          <div style="flex:1;background:#F59E0B15;border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#F59E0B">${(best/1000).toFixed(1)}k</div><div style="font-size:10px;color:#8E8E93">Record</div></div>
-          ${avgWater?`<div style="flex:1;background:#4ECDC415;border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:#4ECDC4">${avgWater}</div><div style="font-size:10px;color:#8E8E93">Moy. eau/j</div></div>`:""}
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-bottom:4px">
-          ${allSteps.slice(0,7).reverse().map(({date,v})=>{const h=Math.max(4,Math.round((v/maxV)*54));const ok=v>=10000;return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px"><div style="font-size:8px;color:#8E8E93">${v>=1000?(v/1000).toFixed(1)+"k":v}</div><div style="width:100%;height:${h}px;background:${ok?"#30D158":"#2C2C2E"};border-radius:3px 3px 0 0"></div></div>`;}).join("")}
-        </div>
-        <div style="font-size:9px;color:#8E8E93;text-align:center">7 derniers jours enregistrés</div>`;
-      })()}
-    </div>
-
     <!-- Sommeil -->
     <div style="font-size:11px;color:#8E8E93;font-weight:700;letter-spacing:.6px;margin-bottom:8px">SOMMEIL</div>
     <div class="card" style="margin-bottom:14px">
@@ -876,7 +766,7 @@ function buildSleepCorr(){
 function buildLibList(day){
   const filter=S.libFilter;const list=filter?LIB.filter(e=>e.muscle===filter):LIB;
   if(!list.length)return`<div style="text-align:center;color:#8E8E93;padding:20px">Aucun exercice</div>`;
-  return list.map(ex=>{const mg=MG.find(m=>m.id===ex.muscle);const ml={"weight+reps":"🏋️ Poids+Reps","reps":"🔢 Reps","time":"⏱ Temps","weight+time":"🏋️ Poids+Temps"}[ex.measure]||"";return`<div class="lib-row" onclick="G.addExercise('${day}','${ex.id}')"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;line-height:1.3">${ex.name}</div><div style="display:flex;gap:8px;margin-top:3px">${mg?`<span style="font-size:10px;font-weight:700;color:${mg.color}">${mg.label}</span>`:""}<span style="font-size:10px;color:#8E8E93">${ml}</span>${ex.tip?`<span style="font-size:10px;color:#8E8E93;font-style:italic">· ${ex.tip}</span>`:""}</div></div><div style="font-size:22px;color:#4ECDC4;font-weight:700;margin-left:10px">+</div></div>`;}).join("");
+  return list.map(ex=>{const mg=MG.find(m=>m.id===ex.muscle);const ml={`weight+reps`:"🏋️ Poids+Reps","reps":"🔢 Reps","time":"⏱ Temps","weight+time":"🏋️ Poids+Temps"}[ex.measure]||"";return`<div class="lib-row" onclick="G.addExercise('${day}','${ex.id}')"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;line-height:1.3">${ex.name}</div><div style="display:flex;gap:8px;margin-top:3px">${mg?`<span style="font-size:10px;font-weight:700;color:${mg.color}">${mg.label}</span>`:""}<span style="font-size:10px;color:#8E8E93">${ml}</span>${ex.tip?`<span style="font-size:10px;color:#8E8E93;font-style:italic">· ${ex.tip}</span>`:""}</div></div><div style="font-size:22px;color:#4ECDC4;font-weight:700;margin-left:10px">+</div></div>`;}).join("");
 }
 function renderLibModal(day){
   const mc=document.getElementById("modal-container");if(!mc)return;
@@ -906,14 +796,9 @@ function openFoodSearch(){
         <div style="font-size:17px;font-weight:700">🔍 Rechercher un aliment</div>
         <button onclick="closeModal()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 14px;color:#F2F2F7;font-size:13px;font-weight:600">✕</button>
       </div>
-      <input class="modal-input" id="fsearch" placeholder="Ex: poulet, riz, fromage blanc..." style="margin:0" autofocus oninput="G.doFoodSearch(this.value)"/>
+      <input class="modal-input" id="fsearch" placeholder="Ex: fromage blanc 0%, riz basmati..." style="margin:0" oninput="G.doFoodSearch(this.value)"/>
     </div>
-    <div class="modal-body" id="fresults">
-      <div style="text-align:center;color:#8E8E93;padding:12px 0 4px;font-size:12px">Recherche dans USDA + Open Food Facts</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px">
-        ${["Poulet","Riz","Oeuf","Fromage blanc","Avoine","Saumon","Boeuf","Banane","Pain"].map(s=>`<button onclick="document.getElementById('fsearch').value='${s}';G.doFoodSearch('${s}')" style="background:#2C2C2E;border:none;border-radius:8px;padding:5px 10px;color:#8E8E93;font-size:11px;font-weight:600;cursor:pointer">${s}</button>`).join("")}
-      </div>
-    </div>
+    <div class="modal-body" id="fresults"><div style="text-align:center;color:#8E8E93;padding:20px">Tape pour rechercher</div></div>
   </div></div>`;
 }
 
@@ -939,6 +824,7 @@ function openManualFood(){
 /* ════════════════════════════════════════════
    GLOBAL HANDLERS
 ════════════════════════════════════════════ */
+let foodSearchTimer=null;
 window.G={
   startTimer,stopTimer,togglePause,
   setTab(id){S.tab=id;updateNav();if(id==="home")renderHome();else if(id==="workout")renderWorkout();else if(id==="nutrition")renderNutrition();else if(id==="stats")renderStats();},
@@ -974,21 +860,12 @@ window.G={
     el.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
     foodSearchTimer=setTimeout(async()=>{
       const results=await searchFood(val);
-      // Show partial results as they come (handled inside searchFood)
       if(!document.getElementById("fresults"))return;
       if(!results.length){document.getElementById("fresults").innerHTML=`<div style="text-align:center;color:#8E8E93;padding:20px">Aucun résultat — essaie en anglais ou utilise la saisie manuelle</div>`;return;}
       window._foodResults=results;
-      const srcLabel={usda:"🇺🇸 USDA",off:"🌍 Open FF",nix:"📊 DB","manual":"✏️"};
       document.getElementById("fresults").innerHTML=results.map((f,i)=>`<div class="food-row" style="padding:10px 0">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;line-height:1.3;margin-bottom:2px">${f.name}</div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:10px;font-weight:700;color:#F59E0B">${f.kcal} kcal</span>
-            <span style="font-size:10px;color:#8E8E93">P:${f.prot}g G:${f.carb}g L:${f.fat}g</span>
-            <span style="font-size:9px;color:#3C3C3E">${srcLabel[f.source]||""} /100g</span>
-          </div>
-        </div>
-        <button onclick="G.pickFood(${i})" style="background:#4ECDC420;border:1px solid #4ECDC4;border-radius:10px;padding:8px 12px;color:#4ECDC4;font-size:13px;font-weight:700;flex-shrink:0;margin-left:8px">+</button>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div><div style="font-size:11px;color:#8E8E93;margin-top:2px">${f.kcal}kcal · P:${f.prot}g · G:${f.carb}g · L:${f.fat}g <span>/ 100g</span></div></div>
+        <button onclick="G.pickFood(${i})" style="background:#4ECDC420;border:1px solid #4ECDC4;border-radius:8px;padding:6px 10px;color:#4ECDC4;font-size:12px;font-weight:700;flex-shrink:0;margin-left:8px">+</button>
       </div>`).join("");
     },600);
   },
@@ -1030,8 +907,6 @@ window.G={
   removeFood(idx){if(!S.isOwner)return;const today=todayKey();S.nutritionData.foodLog[today].splice(idx,1);nutSched();renderNutrition();},
   // Stats
   setSleep(key,val){if(!S.isOwner||isNaN(val))return;S.statsData.sleep[key]=val;statsSched();renderStats();},
-  saveSteps(v){if(!S.isOwner)return;setTodaySteps(v);renderWorkoutContent();},
-  addWater(delta){if(!S.isOwner)return;setTodayWater(getTodayWater()+delta);renderWorkoutContent();},
   // Delete
   showDeleteConfirm(){
     const app=document.getElementById("app");if(document.getElementById("del-ov"))return;
