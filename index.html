@@ -464,8 +464,392 @@ function updateTimerUI(){
 }
 
 /* ════════════════════════════════════════════
-   RENDER ENGINE
+   SHARE CARDS — Canvas natif
 ════════════════════════════════════════════ */
+function drawRoundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
+
+function shareCanvas(canvas,filename){
+  canvas.toBlob(blob=>{
+    const url=URL.createObjectURL(blob);
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],"vtaper.png",{type:"image/png"})]})){
+      navigator.share({files:[new File([blob],filename,{type:"image/png"})],title:"V-Taper"}).catch(()=>{});
+    } else {
+      const a=document.createElement("a");a.href=url;a.download=filename;a.click();
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  },"image/png");
+}
+
+// ── CARTE 1 : Séance ──────────────────────────────────────────────────────────
+function generateSeanceCard(){
+  const week=S.week;const day=DAYS[S.day];const p=S.currentProfile;
+  const exs=getDayExs(day);const st=ST[detectST(exs)];const phase=getPhase(week);
+  const vol=calcVol(week,day);
+  const done=exs.filter((_,i)=>isDoneEx(week,day,i)).length;
+
+  const W=1080,H=1080,sc=2;
+  const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d");
+
+  // Background
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,"#0A0A0C");bg.addColorStop(1,"#111113");
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  // Accent gradient top
+  const acc=ctx.createLinearGradient(0,0,W,300);
+  acc.addColorStop(0,st.color+"40");acc.addColorStop(1,"transparent");
+  ctx.fillStyle=acc;ctx.fillRect(0,0,W,300);
+
+  // Top bar
+  ctx.fillStyle=st.color;ctx.fillRect(0,0,W,8);
+
+  // Logo / branding
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#ffffff30";ctx.textAlign="left";
+  ctx.fillText("V-TAPER",60,80);
+
+  // Phase badge
+  drawRoundRect(ctx,W-240,44,180,44,22);
+  ctx.fillStyle=phase.color+"30";ctx.fill();
+  ctx.strokeStyle=phase.color;ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle=phase.color;ctx.font="bold 22px -apple-system,sans-serif";ctx.textAlign="center";
+  ctx.fillText(`S${week} · ${phase.label}`,W-150,72);
+
+  // Main emoji + session type
+  ctx.font="120px serif";ctx.textAlign="center";ctx.fillText(st.emoji,W/2,260);
+  ctx.font="bold 96px -apple-system,sans-serif";ctx.fillStyle=st.color;
+  ctx.fillText(st.label,W/2,360);
+  ctx.font="bold 36px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+  ctx.fillText(st.sub,W/2,410);
+
+  // Profile name
+  ctx.font="bold 44px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";
+  ctx.fillText(`${p.emoji}  ${p.name}`,W/2,480);
+
+  // Divider
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,510);ctx.lineTo(W-60,510);ctx.stroke();
+
+  // Stats row
+  const stats=[
+    {label:"EXERCICES",value:`${done}/${exs.length}`},
+    {label:"VOLUME",value:vol?`${vol} kg`:"—"},
+    {label:"SEMAINE",value:`${week}/12`},
+  ];
+  stats.forEach((s,i)=>{
+    const x=60+(W-120)/3*i+(W-120)/6;
+    ctx.font="bold 72px -apple-system,sans-serif";ctx.fillStyle=st.color;ctx.textAlign="center";
+    ctx.fillText(s.value,x,610);
+    ctx.font="bold 26px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+    ctx.fillText(s.label,x,650);
+  });
+
+  // Divider
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,680);ctx.lineTo(W-60,680);ctx.stroke();
+
+  // Top exercises (max 4)
+  const topExs=exs.filter((_,i)=>isDoneEx(week,day,i)).slice(0,4);
+  topExs.forEach((ex,i)=>{
+    const lib=LIB.find(e=>e.id===ex.libId)||{name:"Exercice"};
+    const sets=ex.sets||3;let maxW=0;
+    for(let si=0;si<sets;si++){const w=parseFloat(getLog(lk(week,day,i,si,"weight")))||0;if(w>maxW)maxW=w;}
+    const y=730+i*72;
+    ctx.font="bold 30px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="left";
+    ctx.fillText(lib.name.length>32?lib.name.slice(0,32)+"…":lib.name,60,y);
+    if(maxW){ctx.font="bold 30px -apple-system,sans-serif";ctx.fillStyle=st.color;ctx.textAlign="right";ctx.fillText(`${maxW} kg`,W-60,y);}
+  });
+  if(!topExs.length){
+    ctx.font="bold 34px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="center";
+    ctx.fillText("Séance en cours 💪",W/2,760);
+  }
+
+  // Bottom watermark
+  ctx.font="28px -apple-system,sans-serif";ctx.fillStyle="#ffffff20";ctx.textAlign="center";
+  ctx.fillText("vtaper.app",W/2,H-40);
+
+  shareCanvas(canvas,`vtaper_seance_${day}_s${week}.png`);
+}
+
+// ── CARTE 2 : Semaine ─────────────────────────────────────────────────────────
+function generateSemaineCard(){
+  const week=S.week;const p=S.currentProfile;const phase=getPhase(week);
+  const W=1080,H=1350;
+  const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle="#0A0A0C";ctx.fillRect(0,0,W,H);
+  const acc=ctx.createLinearGradient(0,0,W,400);
+  acc.addColorStop(0,phase.color+"30");acc.addColorStop(1,"transparent");
+  ctx.fillStyle=acc;ctx.fillRect(0,0,W,400);
+  ctx.fillStyle=phase.color;ctx.fillRect(0,0,W,8);
+
+  // Header
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#ffffff30";ctx.textAlign="left";ctx.fillText("V-TAPER",60,80);
+  ctx.font="bold 80px -apple-system,sans-serif";ctx.fillStyle=phase.color;ctx.textAlign="center";
+  ctx.fillText(`SEMAINE ${week}`,W/2,160);
+  ctx.font="bold 36px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+  ctx.fillText(`${phase.name} · ${phase.label}`,W/2,210);
+  ctx.font="bold 44px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";
+  ctx.fillText(`${p.emoji}  ${p.name}`,W/2,275);
+
+  // Week progress bar
+  const totalAll=DAYS.reduce((a,d)=>a+getDayExs(d).length,0);
+  const doneAll=DAYS.reduce((a,d)=>a+getDayExs(d).filter((_,i)=>isDoneEx(week,d,i)).length,0);
+  const weekPct=totalAll>0?Math.round((doneAll/totalAll)*100):0;
+  drawRoundRect(ctx,60,300,W-120,16,8);ctx.fillStyle="#2C2C2E";ctx.fill();
+  drawRoundRect(ctx,60,300,Math.max(16,(W-120)*weekPct/100),16,8);ctx.fillStyle=phase.color;ctx.fill();
+  ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle=phase.color;ctx.textAlign="right";
+  ctx.fillText(`${weekPct}%`,W-60,295);
+
+  // Day cards
+  const cardW=(W-120-60)/7;const cardH=200;const startY=340;
+  DAYS.forEach((d,i)=>{
+    const exs=getDayExs(d);const dst=ST[detectST(exs)];
+    const dn=exs.filter((_,j)=>isDoneEx(week,d,j)).length;
+    const full=exs.length>0&&dn===exs.length;
+    const vol=calcVol(week,d);
+    const x=60+i*(cardW+10);const y=startY;
+
+    drawRoundRect(ctx,x,y,cardW,cardH,16);
+    ctx.fillStyle=full?dst.color+"20":"#1C1C1E";ctx.fill();
+    ctx.strokeStyle=full?dst.color:"#2C2C2E";ctx.lineWidth=2;ctx.stroke();
+
+    ctx.font="36px serif";ctx.textAlign="center";ctx.fillText(full?"✅":dst.emoji,x+cardW/2,y+50);
+    ctx.font="bold 22px -apple-system,sans-serif";ctx.fillStyle=full?dst.color:"#8E8E93";
+    ctx.fillText(d,x+cardW/2,y+80);
+    ctx.font="bold 22px -apple-system,sans-serif";ctx.fillStyle=full?"#30D158":"#8E8E93";
+    ctx.fillText(dst.label,x+cardW/2,y+110);
+    if(vol){ctx.font="bold 24px -apple-system,sans-serif";ctx.fillStyle=dst.color;ctx.fillText(`${vol}kg`,x+cardW/2,y+145);}
+    ctx.font="22px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+    ctx.fillText(`${dn}/${exs.length}`,x+cardW/2,y+175);
+  });
+
+  // Volume chart
+  const vols=DAYS.map(d=>calcVol(week,d));const maxV=Math.max(...vols,1);
+  const barW=80;const barArea=W-120;const barSpacing=barArea/7;
+  const chartTop=600;const chartH=180;
+  ctx.font="bold 30px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="left";
+  ctx.fillText("VOLUME PAR JOUR",60,590);
+  vols.forEach((v,i)=>{
+    const bx=60+i*barSpacing+(barSpacing-barW)/2;
+    const bh=v>0?Math.max(8,Math.round((v/maxV)*chartH)):4;
+    const by=chartTop+chartH-bh;
+    drawRoundRect(ctx,bx,by,barW,bh,6);
+    ctx.fillStyle=v>0?phase.color+"80":"#2C2C2E";ctx.fill();
+    if(v>0){ctx.font="bold 22px -apple-system,sans-serif";ctx.fillStyle=phase.color;ctx.textAlign="center";ctx.fillText(v,bx+barW/2,by-10);}
+    ctx.font="bold 24px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+    ctx.fillText(DAYS[i],bx+barW/2,chartTop+chartH+34);
+  });
+
+  // Total volume + stats
+  const totalVol=vols.reduce((a,b)=>a+b,0);
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,840);ctx.lineTo(W-60,840);ctx.stroke();
+  const bigs=[{l:"SÉANCES",v:`${DAYS.filter(d=>getDayExs(d).length>0).length}/7`},{l:"VOLUME TOTAL",v:`${totalVol}kg`},{l:"PROGRESSION",v:`${weekPct}%`}];
+  bigs.forEach((b,i)=>{const x=60+(W-120)/3*i+(W-120)/6;ctx.font="bold 72px -apple-system,sans-serif";ctx.fillStyle=phase.color;ctx.textAlign="center";ctx.fillText(b.v,x,940);ctx.font="bold 26px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.fillText(b.l,x,980);});
+
+  // 12-week phase progress
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,1020);ctx.lineTo(W-60,1020);ctx.stroke();
+  ctx.font="bold 30px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="left";ctx.fillText("PROGRESSION 12 SEMAINES",60,1070);
+  PHASES.forEach((ph,i)=>{
+    const y=1100+i*80;const tot=ph.weeks.reduce((a,w)=>a+DAYS.reduce((b,d)=>b+getDayExs(d).length,0),0);
+    const dn2=ph.weeks.reduce((a,w)=>a+DAYS.reduce((b,d)=>b+getDayExs(d).filter((_,j)=>isDoneEx(w,d,j)).length,0),0);
+    const pct=tot>0?Math.round((dn2/tot)*100):0;
+    ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="left";ctx.fillText(ph.name,60,y);
+    ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle=ph.color;ctx.textAlign="right";ctx.fillText(`${pct}%`,W-60,y);
+    drawRoundRect(ctx,60,y+10,W-120,12,6);ctx.fillStyle="#2C2C2E";ctx.fill();
+    if(pct>0){drawRoundRect(ctx,60,y+10,Math.max(12,(W-120)*pct/100),12,6);ctx.fillStyle=ph.color;ctx.fill();}
+  });
+
+  ctx.font="28px -apple-system,sans-serif";ctx.fillStyle="#ffffff20";ctx.textAlign="center";ctx.fillText("vtaper.app",W/2,H-40);
+  shareCanvas(canvas,`vtaper_semaine_${week}.png`);
+}
+
+// ── CARTE 3 : Nutrition ───────────────────────────────────────────────────────
+function generateNutritionCard(){
+  const p=S.currentProfile;const np=S.nutritionData.profile||{};
+  const goal=np.goal||"maintien";const gc=GOAL_COLORS[goal];
+  const tdeeData=calcTDEE(np);const targetCals=tdeeData?tdeeData.targets[goal]:null;
+  const today=todayKey();const todayLog=S.nutritionData.foodLog[today]||[];
+  const totKcal=todayLog.reduce((a,f)=>a+((f.kcal||0)*(f.grams||100)/100),0);
+  const totProt=todayLog.reduce((a,f)=>a+((f.prot||0)*(f.grams||100)/100),0);
+  const totCarb=todayLog.reduce((a,f)=>a+((f.carb||0)*(f.grams||100)/100),0);
+  const totFat=todayLog.reduce((a,f)=>a+((f.fat||0)*(f.grams||100)/100),0);
+  const pct=targetCals?Math.min(100,Math.round((totKcal/targetCals)*100)):0;
+
+  const W=1080,H=1080;
+  const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d");
+
+  ctx.fillStyle="#0A0A0C";ctx.fillRect(0,0,W,H);
+  const acc=ctx.createLinearGradient(0,0,W,300);acc.addColorStop(0,gc+"30");acc.addColorStop(1,"transparent");
+  ctx.fillStyle=acc;ctx.fillRect(0,0,W,300);
+  ctx.fillStyle=gc;ctx.fillRect(0,0,W,8);
+
+  // Header
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#ffffff30";ctx.textAlign="left";ctx.fillText("V-TAPER",60,80);
+  ctx.font="bold 44px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="center";ctx.fillText(`${p.emoji}  ${p.name}`,W/2,120);
+  ctx.font="bold 36px -apple-system,sans-serif";ctx.fillStyle=gc;ctx.fillText(GOAL_LABELS[goal],W/2,170);
+  ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+  ctx.fillText(new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),W/2,215);
+
+  // Donut chart
+  const cx=W/2,cy=440,r=160,lineW=36;
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=lineW;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+  if(pct>0){
+    const angle=(pct/100)*Math.PI*2-Math.PI/2;
+    ctx.strokeStyle=totKcal>targetCals?"#EF4444":gc;ctx.lineWidth=lineW;
+    ctx.lineCap="round";ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,angle);ctx.stroke();
+    ctx.lineCap="butt";
+  }
+  ctx.font="bold 100px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="center";ctx.fillText(Math.round(totKcal),cx,cy+18);
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.fillText("kcal mangées",cx,cy+62);
+  if(targetCals){ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle=gc;ctx.fillText(`/ ${targetCals} kcal objectif`,cx,cy+100);}
+
+  // Macros
+  const macros=[{l:"Protéines",v:Math.round(totProt),u:"g",c:"#FF6B35"},{l:"Glucides",v:Math.round(totCarb),u:"g",c:"#4ECDC4"},{l:"Lipides",v:Math.round(totFat),u:"g",c:"#F59E0B"}];
+  macros.forEach((m,i)=>{
+    const x=60+(W-120)/3*i;const y=680;const mW=(W-120)/3-20;
+    drawRoundRect(ctx,x,y,mW,180,20);ctx.fillStyle=m.c+"20";ctx.fill();
+    ctx.strokeStyle=m.c+"50";ctx.lineWidth=1;ctx.stroke();
+    ctx.font="bold 70px -apple-system,sans-serif";ctx.fillStyle=m.c;ctx.textAlign="center";ctx.fillText(`${m.v}${m.u}`,x+mW/2,y+90);
+    ctx.font="bold 26px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.fillText(m.l,x+mW/2,y+140);
+  });
+
+  // Food list (max 5)
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,890);ctx.lineTo(W-60,890);ctx.stroke();
+  todayLog.slice(0,5).forEach((f,i)=>{
+    const y=930+i*26;const kcal=Math.round((f.kcal||0)*f.grams/100);
+    ctx.font="24px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="left";
+    ctx.fillText((f.name||"").slice(0,40),60,y);
+    ctx.font="bold 24px -apple-system,sans-serif";ctx.fillStyle=gc;ctx.textAlign="right";ctx.fillText(`${kcal}kcal`,W-60,y);
+  });
+  if(todayLog.length>5){ctx.font="22px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="center";ctx.fillText(`+${todayLog.length-5} autres aliments`,W/2,930+5*26);}
+
+  ctx.font="28px -apple-system,sans-serif";ctx.fillStyle="#ffffff20";ctx.textAlign="center";ctx.fillText("vtaper.app",W/2,H-20);
+  shareCanvas(canvas,`vtaper_nutrition_${today}.png`);
+}
+
+// ── CARTE 4 : Progression long terme ─────────────────────────────────────────
+function generateProgressionCard(){
+  const p=S.currentProfile;const week=S.week;
+  const allExIds=[...new Set(DAYS.flatMap(d=>getDayExs(d).map(e=>e.libId)))].filter(Boolean);
+  // Prend l'exercice avec le plus de données
+  let bestEx=null;let bestData=[];
+  allExIds.forEach(libId=>{
+    const data=Array.from({length:12},(_,wi)=>{const w=wi+1;let mx=0;DAYS.forEach(d=>{const exs2=getDayExs(d);const idx=exs2.findIndex(e=>e.libId===libId);if(idx<0)return;for(let si=0;si<(exs2[idx].sets||3);si++){const wv=parseFloat(getLog(lk(w,d,idx,si,"weight")))||0;if(wv>mx)mx=wv;}});return{w,mx};}).filter(x=>x.mx>0);
+    if(data.length>bestData.length){bestData=data;bestEx=libId;}
+  });
+  const lib=LIB.find(e=>e.id===bestEx)||{name:"Exercice"};
+  const mg=MG.find(m=>lib.muscle&&m.id===lib.muscle);
+
+  const W=1080,H=1080;
+  const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d");
+  const color=mg?mg.color:"#4ECDC4";
+
+  ctx.fillStyle="#0A0A0C";ctx.fillRect(0,0,W,H);
+  const acc=ctx.createLinearGradient(0,0,W,300);acc.addColorStop(0,color+"30");acc.addColorStop(1,"transparent");
+  ctx.fillStyle=acc;ctx.fillRect(0,0,W,300);
+  ctx.fillStyle=color;ctx.fillRect(0,0,W,8);
+
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#ffffff30";ctx.textAlign="left";ctx.fillText("V-TAPER",60,80);
+  ctx.font="bold 44px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="center";ctx.fillText(`${p.emoji}  ${p.name}`,W/2,120);
+  ctx.font="bold 36px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.fillText("PROGRESSION",W/2,168);
+
+  if(!bestData.length){
+    ctx.font="bold 36px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="center";ctx.fillText("Pas encore de données 📊",W/2,H/2);
+    shareCanvas(canvas,`vtaper_progression.png`);return;
+  }
+
+  // Exercise name
+  ctx.font="bold 48px -apple-system,sans-serif";ctx.fillStyle=color;ctx.textAlign="center";
+  ctx.fillText(lib.name.length>30?lib.name.slice(0,30)+"…":lib.name,W/2,230);
+  const first=bestData[0].mx;const last=bestData[bestData.length-1].mx;
+  const diff=Math.round(((last-first)/first)*100);
+  ctx.font="bold 80px -apple-system,sans-serif";ctx.fillStyle=diff>=0?"#30D158":"#FF3B30";ctx.textAlign="center";
+  ctx.fillText(`${diff>=0?"+":""}${diff}%`,W/2,340);
+  ctx.font="bold 32px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";
+  ctx.fillText(`${first}kg → ${last}kg depuis S${bestData[0].w}`,W/2,390);
+
+  // Line chart
+  const chartL=80,chartR=W-80,chartT=440,chartB=780;
+  const chartW=chartR-chartL;const chartHh=chartB-chartT;
+  const maxV=Math.max(...bestData.map(x=>x.mx));const minV=Math.min(...bestData.map(x=>x.mx));
+  const range=maxV-minV||1;
+
+  // Grid
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){const y=chartT+chartHh*g/4;ctx.beginPath();ctx.moveTo(chartL,y);ctx.lineTo(chartR,y);ctx.stroke();
+    const val=Math.round(maxV-range*g/4);ctx.font="22px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.textAlign="right";ctx.fillText(`${val}kg`,chartL-10,y+8);}
+
+  // Line gradient
+  const grad=ctx.createLinearGradient(chartL,0,chartR,0);grad.addColorStop(0,color+"80");grad.addColorStop(1,color);
+  ctx.strokeStyle=grad;ctx.lineWidth=6;ctx.lineJoin="round";ctx.lineCap="round";
+  ctx.beginPath();
+  bestData.forEach(({w,mx},i)=>{
+    const x=chartL+(w-1)/(12-1)*chartW;const y=chartT+(1-(mx-minV)/range)*chartHh;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Area under line
+  ctx.beginPath();
+  bestData.forEach(({w,mx},i)=>{const x=chartL+(w-1)/(12-1)*chartW;const y=chartT+(1-(mx-minV)/range)*chartHh;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.lineTo(chartL+(bestData[bestData.length-1].w-1)/(12-1)*chartW,chartB);
+  ctx.lineTo(chartL,chartB);ctx.closePath();
+  const areaGrad=ctx.createLinearGradient(0,chartT,0,chartB);areaGrad.addColorStop(0,color+"30");areaGrad.addColorStop(1,color+"00");
+  ctx.fillStyle=areaGrad;ctx.fill();
+
+  // Data points
+  bestData.forEach(({w,mx})=>{
+    const x=chartL+(w-1)/(12-1)*chartW;const y=chartT+(1-(mx-minV)/range)*chartHh;
+    ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fillStyle="#0A0A0C";ctx.fill();
+    ctx.font="bold 24px -apple-system,sans-serif";ctx.fillStyle="#F2F2F7";ctx.textAlign="center";ctx.fillText(`S${w}`,x,chartB+30);
+  });
+
+  // Current week highlight
+  const curData=bestData.find(x=>x.w===week);
+  if(curData){
+    const cx2=chartL+(week-1)/(12-1)*chartW;const cy2=chartT+(1-(curData.mx-minV)/range)*chartHh;
+    ctx.beginPath();ctx.arc(cx2,cy2,18,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=3;ctx.stroke();
+    ctx.font="bold 28px -apple-system,sans-serif";ctx.fillStyle=color;ctx.textAlign="center";
+    ctx.fillText(`${curData.mx}kg`,cx2,cy2-30);
+  }
+
+  // Bottom stats
+  ctx.strokeStyle="#2C2C2E";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,820);ctx.lineTo(W-60,820);ctx.stroke();
+  const bstats=[{l:"DÉPART",v:`${first}kg`},{l:"ACTUEL",v:`${last}kg`},{l:"GAIN",v:`+${last-first}kg`}];
+  bstats.forEach((b,i)=>{const x=60+(W-120)/3*i+(W-120)/6;ctx.font="bold 72px -apple-system,sans-serif";ctx.fillStyle=color;ctx.textAlign="center";ctx.fillText(b.v,x,920);ctx.font="bold 26px -apple-system,sans-serif";ctx.fillStyle="#8E8E93";ctx.fillText(b.l,x,960);});
+
+  ctx.font="28px -apple-system,sans-serif";ctx.fillStyle="#ffffff20";ctx.textAlign="center";ctx.fillText("vtaper.app",W/2,H-20);
+  shareCanvas(canvas,`vtaper_progression.png`);
+}
+
+// ── MODAL SHARE ───────────────────────────────────────────────────────────────
+function openShareModal(){
+  const mc=document.getElementById("modal-container");if(!mc)return;
+  mc.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="padding:24px 20px 32px" onclick="event.stopPropagation()">
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px">📲 Partager</div>
+    <div style="font-size:13px;color:#8E8E93;margin-bottom:20px">Génère une carte à partager sur les réseaux</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button onclick="closeModal();generateSeanceCard()" style="padding:14px;border-radius:14px;border:1px solid #FF6B35;background:#FF6B3510;color:#F2F2F7;font-size:14px;font-weight:700;text-align:left;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">💪</span><div><div>Carte Séance</div><div style="font-size:12px;color:#8E8E93;font-weight:400">Exercices, volume, poids max</div></div>
+      </button>
+      <button onclick="closeModal();generateSemaineCard()" style="padding:14px;border-radius:14px;border:1px solid #4ECDC4;background:#4ECDC410;color:#F2F2F7;font-size:14px;font-weight:700;text-align:left;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">📅</span><div><div>Carte Semaine</div><div style="font-size:12px;color:#8E8E93;font-weight:400">Bilan hebdo, volume par jour</div></div>
+      </button>
+      <button onclick="closeModal();generateNutritionCard()" style="padding:14px;border-radius:14px;border:1px solid #F59E0B;background:#F59E0B10;color:#F2F2F7;font-size:14px;font-weight:700;text-align:left;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">🥗</span><div><div>Carte Nutrition</div><div style="font-size:12px;color:#8E8E93;font-weight:400">Calories, macros, journal du jour</div></div>
+      </button>
+      <button onclick="closeModal();generateProgressionCard()" style="padding:14px;border-radius:14px;border:1px solid #A855F7;background:#A855F710;color:#F2F2F7;font-size:14px;font-weight:700;text-align:left;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">📈</span><div><div>Carte Progression</div><div style="font-size:12px;color:#8E8E93;font-weight:400">Courbe poids max, évolution</div></div>
+      </button>
+    </div>
+    <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+  </div></div>`;
+}
+
 const NAV_ITEMS=[{id:"home",icon:"🏠",label:"Accueil"},{id:"workout",icon:"💪",label:"Séances"},{id:"nutrition",icon:"🥗",label:"Nutrition"},{id:"stats",icon:"📊",label:"Stats"}];
 
 function renderShell(){
@@ -549,7 +933,10 @@ function renderWorkout(){
   const doneAll=DAYS.reduce((a,d)=>a+getDayExs(d).filter((_,i)=>isDoneEx(week,d,i)).length,0);
   const weekPct=totalAll>0?Math.round((doneAll/totalAll)*100):0;
   setTopBar(`${p.emoji} ${p.name}`,`S${week} · ${phase.label}`,
-    `<div style="display:flex;gap:8px;align-items:center">${S.isOwner?`<button onclick="G.showDeleteConfirm()" style="background:transparent;border:none;color:#8E8E93;font-size:11px;text-decoration:underline">Supprimer</button>`:""}</div>`);
+    `<div style="display:flex;gap:8px;align-items:center">
+      ${S.isOwner?`<button onclick="G.showDeleteConfirm()" style="background:transparent;border:none;color:#8E8E93;font-size:11px;text-decoration:underline">Supprimer</button>`:""}
+      <button onclick="openShareModal()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 11px;color:#F2F2F7;font-size:16px">📲</button>
+    </div>`);
   const mc=document.getElementById("main-content");
   mc.innerHTML=`
     <div id="workout-top">
@@ -675,7 +1062,8 @@ function renderNutrition(){
     return;
   }
 
-  setTopBar(`${p.emoji} Nutrition`,"🥗 TDEE · Calories · Macros");
+  setTopBar(`${p.emoji} Nutrition`,"🥗 TDEE · Calories · Macros",
+    `<button onclick="openShareModal()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 11px;color:#F2F2F7;font-size:16px">📲</button>`);
   document.getElementById("main-content").innerHTML=`<div class="scroll-view" style="padding:12px 16px" id="nut-scroll">
 
     <!-- OBJECTIF -->
@@ -754,7 +1142,8 @@ function renderStats(){
   if(!S.currentProfile){setTopBar("Stats","📊");document.getElementById("main-content").innerHTML=noProfileMsg();return;}
   const p=S.currentProfile;const week=S.week;const day=DAYS[S.day];
   const phase=getPhase(week);
-  setTopBar(`${p.emoji} Stats`,"📊 Volume · Sommeil · Progression");
+  setTopBar(`${p.emoji} Stats`,"📊 Volume · Sommeil · Progression",
+    `<button onclick="openShareModal()" style="background:#2C2C2E;border:none;border-radius:10px;padding:7px 11px;color:#F2F2F7;font-size:16px">📲</button>`);
 
   // Per-exercise volumes for selected day+week
   const exs=getDayExs(day);
@@ -1313,7 +1702,7 @@ window.G={
   },
 };
 
-window.renderHome=renderHome;window.closeModal=closeModal;window.FOOD_DB=FOOD_DB;window.buildFoodCategoryBrowse=buildFoodCategoryBrowse;window.buildFoodRow=buildFoodRow;window.buildMealIngResults=buildMealIngResults;window._mealIngredients=_mealIngredients;window.searchFoodLocal=searchFoodLocal;window.renderMealBuilder=renderMealBuilder;
+window.renderHome=renderHome;window.closeModal=closeModal;window.openShareModal=openShareModal;window.FOOD_DB=FOOD_DB;window.buildFoodCategoryBrowse=buildFoodCategoryBrowse;window.buildFoodRow=buildFoodRow;window.buildMealIngResults=buildMealIngResults;window._mealIngredients=_mealIngredients;window.searchFoodLocal=searchFoodLocal;window.renderMealBuilder=renderMealBuilder;window.searchUSDA=searchUSDA;
 
 /* ── INIT ── */
 async function init(){
