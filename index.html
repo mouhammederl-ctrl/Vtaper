@@ -352,31 +352,88 @@ function searchFoodLocal(q){
   return FOOD_DB.filter(f=>terms.every(t=>f.name.toLowerCase().includes(t)||f.cat.toLowerCase().includes(t))).slice(0,8);
 }
 
-async function searchFoodOFF(q){
+const USDA_KEY="M0ORLQ6xuYZetKQnFUbsdMmQOZirhySJ4CUP0890";
+
+// Dictionnaire FR→EN pour les ingrédients courants
+const FR_EN={
+  "poulet":"chicken","escalope":"chicken breast","blanc de poulet":"chicken breast",
+  "cuisse de poulet":"chicken thigh","dinde":"turkey","boeuf":"beef","bœuf":"beef",
+  "saumon":"salmon","thon":"tuna","cabillaud":"cod","crevettes":"shrimp",
+  "riz":"rice","pates":"pasta","pâtes":"pasta","patate douce":"sweet potato",
+  "pomme de terre":"potato","avoine":"oats","flocons avoine":"oats","pain":"bread",
+  "quinoa":"quinoa","lentilles":"lentils","pois chiches":"chickpeas",
+  "haricots":"beans","oeuf":"egg","oeuf entier":"whole egg","blanc oeuf":"egg white",
+  "fromage blanc":"cottage cheese","yaourt":"yogurt","lait":"milk","skyr":"skyr",
+  "brocoli":"broccoli","epinards":"spinach","épinards":"spinach","courgette":"zucchini",
+  "tomate":"tomato","concombre":"cucumber","salade":"lettuce","poivron":"bell pepper",
+  "champignon":"mushroom","huile olive":"olive oil","huile":"oil","beurre":"butter",
+  "banane":"banana","pomme":"apple","myrtille":"blueberry","whey":"whey protein",
+  "eau":"water","sauce soja":"soy sauce","sel":"salt","poivre":"pepper",
+  "ail":"garlic","oignon":"onion","carotte":"carrot","boeuf hache":"ground beef",
+  "steak":"beef steak","filet":"fillet","maquereaux":"mackerel","thon naturel":"tuna",
+};
+
+function translateFR(q){
+  const ql=q.toLowerCase().trim();
+  // Essai direct
+  for(const[fr,en]of Object.entries(FR_EN)){
+    if(ql.includes(fr))return ql.replace(fr,en);
+  }
+  return ql; // retourne tel quel si pas de traduction
+}
+
+async function searchUSDA(q){
   try{
-    const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments`);
-    const d=await r.json();
-    return(d.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments["energy-kcal_100g"]).slice(0,5).map(p=>({
-      id:"off_"+Math.random(),
-      name:p.product_name,
-      kcal:Math.round(p.nutriments["energy-kcal_100g"]||0),
-      prot:Math.round(p.nutriments.proteins_100g||0),
-      carb:Math.round(p.nutriments.carbohydrates_100g||0),
-      fat:Math.round(p.nutriments.fat_100g||0),
-      source:"off",cat:"📦 Produit emballé"
-    }));
+    const enQuery=translateFR(q);
+    const url=`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(enQuery)}&dataType=Foundation,SR%20Legacy&pageSize=6&api_key=${USDA_KEY}`;
+    const r=await fetch(url);const d=await r.json();
+    if(!d.foods)return[];
+    return d.foods.slice(0,6).map(f=>{
+      const nutr=f.foodNutrients||[];
+      const get=n=>Math.round((nutr.find(x=>x.nutrientName&&x.nutrientName.includes(n))?.value)||0);
+      return{
+        id:"usda_"+f.fdcId,
+        name:f.description,
+        nameFR:q, // garde le terme français saisi
+        kcal:get("Energy"),
+        prot:get("Protein"),
+        carb:get("Carbohydrate"),
+        fat:get("Total lipid"),
+        source:"usda",cat:"🔬 USDA"
+      };
+    }).filter(f=>f.kcal>0);
   }catch(e){return[];}
 }
 
 async function searchFood(q){
+  if(!q.trim())return[];
+  // 1. Base locale FR (instantané)
   const local=searchFoodLocal(q);
-  if(local.length>=3)return local;
-  // Not enough local results → try OFF
-  const off=await searchFoodOFF(q);
-  // Merge, deduplicate by name
-  const all=[...local,...off.filter(o=>!local.some(l=>l.name.toLowerCase()===o.name.toLowerCase()))];
-  return all.slice(0,8);
+  if(local.length>=4)return local;
+  // 2. USDA (aliments bruts, h24, illimité)
+  const usda=await searchUSDA(q);
+  // 3. Open Food Facts en dernier recours (produits emballés)
+  let off=[];
+  if(local.length+usda.length<3){
+    try{
+      const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=4&fields=product_name,nutriments`);
+      const d=await r.json();
+      off=(d.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments["energy-kcal_100g"]).slice(0,4).map(p=>({
+        id:"off_"+Math.random(),name:p.product_name,
+        kcal:Math.round(p.nutriments["energy-kcal_100g"]||0),
+        prot:Math.round(p.nutriments.proteins_100g||0),
+        carb:Math.round(p.nutriments.carbohydrates_100g||0),
+        fat:Math.round(p.nutriments.fat_100g||0),
+        source:"off",cat:"📦 Produit emballé"
+      }));
+    }catch(e){}
+  }
+  // Merge sans doublons
+  const all=[...local,...usda,...off];
+  const seen=new Set();
+  return all.filter(f=>{const k=f.name.toLowerCase().slice(0,20);if(seen.has(k))return false;seen.add(k);return true;}).slice(0,8);
 }
+
 
 /* ── TIMER ── */
 function fmt(s){return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
@@ -922,9 +979,12 @@ function buildFoodRow(f,onclick){
 // Meal builder state
 let _mealIngredients=[];
 let _mealName="";
+let _mealCookedWeight=0;
+let _mealPortionWeight=0;
+let _ingSearchTimer=null;
 
 function openMealBuilder(){
-  _mealIngredients=[];_mealName="";
+  _mealIngredients=[];_mealName="";_mealCookedWeight=0;_mealPortionWeight=0;
   renderMealBuilder();
 }
 
@@ -934,6 +994,15 @@ function renderMealBuilder(){
   const totProt=_mealIngredients.reduce((a,i)=>a+(i.prot*i.grams/100),0);
   const totCarb=_mealIngredients.reduce((a,i)=>a+(i.carb*i.grams/100),0);
   const totFat=_mealIngredients.reduce((a,i)=>a+(i.fat*i.grams/100),0);
+  const totalIngGrams=_mealIngredients.reduce((a,i)=>a+i.grams,0);
+  // Portion calculation
+  const cookedW=_mealCookedWeight||0;
+  const portionW=_mealPortionWeight||0;
+  const ratio=cookedW>0&&portionW>0?portionW/cookedW:1;
+  const portionKcal=Math.round(totKcal*ratio);
+  const portionProt=Math.round(totProt*ratio);
+  const portionCarb=Math.round(totCarb*ratio);
+  const portionFat=Math.round(totFat*ratio);
 
   mc.innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box">
     <div class="modal-header">
@@ -944,41 +1013,85 @@ function renderMealBuilder(){
       <input class="modal-input" id="meal-name" placeholder="Nom du plat (ex: Riz poulet maison)" value="${_mealName}" oninput="_mealName=this.value" style="margin:0"/>
     </div>
     <div class="modal-body">
-      <!-- Total plat -->
-      ${_mealIngredients.length?`<div style="background:#111113;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;gap:12px;align-items:center">
-        <div><div style="font-size:18px;font-weight:700;color:#F59E0B">${Math.round(totKcal)} kcal</div><div style="font-size:10px;color:#8E8E93">Total plat</div></div>
-        <div style="display:flex;gap:8px;margin-left:auto">
-          <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#FF6B35">${Math.round(totProt)}g</div><div style="font-size:9px;color:#8E8E93">P</div></div>
-          <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#4ECDC4">${Math.round(totCarb)}g</div><div style="font-size:9px;color:#8E8E93">G</div></div>
-          <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#F59E0B">${Math.round(totFat)}g</div><div style="font-size:9px;color:#8E8E93">L</div></div>
+
+      <!-- Total brut ingrédients -->
+      ${_mealIngredients.length?`
+      <div style="background:#111113;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-size:10px;color:#8E8E93;font-weight:700;margin-bottom:6px">TOTAL INGRÉDIENTS CRUS</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div><div style="font-size:20px;font-weight:700;color:#F59E0B">${Math.round(totKcal)} kcal</div><div style="font-size:10px;color:#8E8E93">${totalIngGrams}g total</div></div>
+          <div style="display:flex;gap:8px;margin-left:auto">
+            <div style="text-align:center"><div style="font-size:13px;font-weight:700;color:#FF6B35">${Math.round(totProt)}g</div><div style="font-size:9px;color:#8E8E93">P</div></div>
+            <div style="text-align:center"><div style="font-size:13px;font-weight:700;color:#4ECDC4">${Math.round(totCarb)}g</div><div style="font-size:9px;color:#8E8E93">G</div></div>
+            <div style="text-align:center"><div style="font-size:13px;font-weight:700;color:#F59E0B">${Math.round(totFat)}g</div><div style="font-size:9px;color:#8E8E93">L</div></div>
+          </div>
         </div>
+      </div>
+
+      <!-- Poids plat cuit + portion -->
+      <div style="background:#1C1C1E;border-radius:10px;padding:10px 12px;margin-bottom:12px;border:1px solid #2C2C2E">
+        <div style="font-size:10px;color:#8E8E93;font-weight:700;margin-bottom:8px">🍳 APRÈS CUISSON</div>
+        <div style="display:flex;gap:10px;margin-bottom:8px;align-items:center">
+          <div style="flex:1">
+            <div style="font-size:10px;color:#8E8E93;margin-bottom:4px">Poids total plat cuit</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="number" id="cooked-w" placeholder="ex: 600" value="${cookedW||""}" min="1" max="5000"
+                oninput="_mealCookedWeight=parseFloat(this.value)||0;renderMealBuilder()"
+                style="width:80px;background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2F7;font-size:13px;font-weight:700;text-align:center;padding:6px;outline:none"/>
+              <span style="font-size:11px;color:#8E8E93">g</span>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:#8E8E93;margin-bottom:4px">Ma portion mangée</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="number" id="portion-w" placeholder="ex: 300" value="${portionW||""}" min="1" max="5000"
+                oninput="_mealPortionWeight=parseFloat(this.value)||0;renderMealBuilder()"
+                style="width:80px;background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2F7;font-size:13px;font-weight:700;text-align:center;padding:6px;outline:none"/>
+              <span style="font-size:11px;color:#8E8E93">g</span>
+            </div>
+          </div>
+        </div>
+        ${cookedW>0&&portionW>0?`
+        <div style="background:#4ECDC420;border-radius:8px;padding:8px 10px;border:1px solid #4ECDC440">
+          <div style="font-size:10px;color:#4ECDC4;font-weight:700;margin-bottom:4px">MA PORTION (${portionW}g = ${Math.round(ratio*100)}% du plat)</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="font-size:20px;font-weight:700;color:#4ECDC4">${portionKcal} kcal</div>
+            <div style="display:flex;gap:8px;margin-left:auto">
+              <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#FF6B35">${portionProt}g</div><div style="font-size:9px;color:#8E8E93">P</div></div>
+              <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#4ECDC4">${portionCarb}g</div><div style="font-size:9px;color:#8E8E93">G</div></div>
+              <div style="text-align:center"><div style="font-size:12px;font-weight:700;color:#F59E0B">${portionFat}g</div><div style="font-size:9px;color:#8E8E93">L</div></div>
+            </div>
+          </div>
+        </div>`:`<div style="font-size:11px;color:#8E8E93;font-style:italic">Pèse le plat cuit puis ta portion pour un calcul précis 🎯</div>`}
       </div>`:""}
 
       <!-- Ingrédients ajoutés -->
       ${_mealIngredients.map((ing,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1E1E20">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ing.name}</div>
-          <div style="font-size:11px;color:#8E8E93">${ing.grams}${ing.unit||"g"} → ${Math.round(ing.kcal*ing.grams/100)}kcal · P:${Math.round(ing.prot*ing.grams/100)}g</div>
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ing.name}</div>
+          <div style="font-size:10px;color:#8E8E93">${ing.grams}${ing.unit||"g"} → ${Math.round(ing.kcal*ing.grams/100)}kcal · P:${Math.round(ing.prot*ing.grams/100)}g</div>
         </div>
-        <input type="number" value="${ing.grams}" min="1" max="2000" style="width:56px;background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2F7;font-size:13px;font-weight:700;text-align:center;padding:5px;outline:none" onchange="G.updateMealIngGrams(${i},this.value)"/>
-        <span style="font-size:11px;color:#8E8E93">${ing.unit||"g"}</span>
-        <button onclick="G.removeMealIng(${i})" style="background:#2C2C2E;border:none;border-radius:7px;padding:4px 8px;color:#8E8E93;font-size:11px">✕</button>
+        <input type="number" value="${ing.grams}" min="1" max="5000"
+          style="width:54px;background:#111113;border:1px solid #2C2C2E;border-radius:8px;color:#F2F2F7;font-size:13px;font-weight:700;text-align:center;padding:5px;outline:none"
+          onchange="G.updateMealIngGrams(${i},this.value)"/>
+        <span style="font-size:10px;color:#8E8E93;flex-shrink:0">${ing.unit||"g"}</span>
+        <button onclick="G.removeMealIng(${i})" style="background:#2C2C2E;border:none;border-radius:7px;padding:4px 8px;color:#8E8E93;font-size:11px;flex-shrink:0">✕</button>
       </div>`).join("")}
 
-      <!-- Ajouter ingrédient -->
-      <div style="margin:12px 0 6px;font-size:11px;color:#8E8E93;font-weight:700">AJOUTER UN INGRÉDIENT</div>
-      <input class="modal-input" id="ing-search" placeholder="Recherche... (poulet, riz, huile...)" oninput="G.mealIngSearch(this.value)" style="margin-bottom:8px"/>
-      <div id="ing-results">
-        ${buildMealIngResults("")}
+      <!-- Recherche ingrédient -->
+      <div style="margin:10px 0 6px;font-size:11px;color:#8E8E93;font-weight:700">AJOUTER UN INGRÉDIENT</div>
+      <div style="position:relative;margin-bottom:8px">
+        <input class="modal-input" id="ing-search" placeholder="Ex: escalope poulet, riz, brocoli, huile..." oninput="G.mealIngSearch(this.value)" style="margin:0;padding-right:40px"/>
+        <div id="ing-loading" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%)"><div style="width:16px;height:16px;border:2px solid #2C2C2E;border-top-color:#4ECDC4;border-radius:50%;animation:spin 0.8s linear infinite"></div></div>
       </div>
+      <div id="ing-results">${buildMealIngResults("")}</div>
 
-      <!-- Actions -->
-      ${_mealIngredients.length&&_mealName?`
-        <div style="display:flex;gap:8px;margin-top:16px">
+      <!-- Boutons action -->
+      ${_mealIngredients.length?`
+        <div style="display:flex;gap:8px;margin-top:14px">
           <button onclick="G.logMealNow()" style="flex:1;padding:12px;border-radius:12px;border:none;background:#2C2C2E;color:#F2F2F7;font-size:13px;font-weight:700">Ajouter au journal</button>
-          <button onclick="G.saveMeal()" style="flex:1;padding:12px;border-radius:12px;border:none;background:#4ECDC4;color:#111113;font-size:13px;font-weight:700">💾 Sauvegarder + Ajouter</button>
-        </div>`:
-        _mealIngredients.length?`<button onclick="G.logMealNow()" style="width:100%;padding:12px;border-radius:12px;border:none;background:#2C2C2E;color:#F2F2F7;font-size:13px;font-weight:700;margin-top:16px">Ajouter au journal sans sauvegarder</button>`:""}
+          ${_mealName?`<button onclick="G.saveMeal()" style="flex:1;padding:12px;border-radius:12px;border:none;background:#4ECDC4;color:#111113;font-size:13px;font-weight:700">💾 Sauvegarder</button>`:""}
+        </div>`:""}
     </div>
   </div></div>`;
 }
@@ -1083,7 +1196,41 @@ window.G={
     nutSched();closeModal();renderNutrition();
   },
   // Meal builder
-  mealIngSearch(val){const el=document.getElementById("ing-results");if(el)el.innerHTML=buildMealIngResults(val);},
+  mealIngSearch(val){
+    const el=document.getElementById("ing-results");
+    const ld=document.getElementById("ing-loading");
+    if(!el)return;
+    // Show local results immediately
+    el.innerHTML=buildMealIngResults(val);
+    if(!val.trim())return;
+    // Then async USDA search
+    clearTimeout(_ingSearchTimer);
+    if(ld)ld.style.display="flex";
+    _ingSearchTimer=setTimeout(async()=>{
+      const usda=await searchUSDA(val);
+      if(ld)ld.style.display="none";
+      const ingEl=document.getElementById("ing-results");if(!ingEl)return;
+      const local=searchFoodLocal(val);
+      const combined=[...local,...usda.filter(u=>!local.some(l=>l.name.toLowerCase().slice(0,15)===u.name.toLowerCase().slice(0,15)))];
+      if(!combined.length){ingEl.innerHTML=`<div style="text-align:center;color:#8E8E93;padding:12px;font-size:13px">Aucun résultat — essaie en anglais</div>`;return;}
+      window._ingResults=combined;
+      ingEl.innerHTML=combined.map((f,i)=>`<div class="food-row" onclick="G.addMealIngByIdx(${i})" style="cursor:pointer">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+          <div style="display:flex;gap:6px;margin-top:2px;align-items:center">
+            <span style="font-size:10px;font-weight:700;color:${f.source==="usda"?"#A855F7":f.source==="off"?"#FF6B35":"#4ECDC4"}">${f.source==="usda"?"USDA":f.source==="off"?"Emballé":"Base FR"}</span>
+            <span style="font-size:11px;color:#8E8E93">${f.kcal}kcal · P:${f.prot}g · G:${f.carb}g · L:${f.fat}g / 100g</span>
+          </div>
+        </div>
+        <div style="font-size:20px;color:#4ECDC4;font-weight:700;margin-left:10px">+</div>
+      </div>`).join("");
+    },500);
+  },
+  addMealIngByIdx(idx){
+    const f=(window._ingResults||[])[idx];if(!f)return;
+    _mealIngredients.push({...f,grams:100});
+    renderMealBuilder();
+  },
   addMealIng(fid){
     const f=FOOD_DB.find(x=>x.id===fid);if(!f)return;
     _mealIngredients.push({...f,grams:100});
@@ -1098,9 +1245,21 @@ window.G={
     const totProt=_mealIngredients.reduce((a,i)=>a+(i.prot*i.grams/100),0);
     const totCarb=_mealIngredients.reduce((a,i)=>a+(i.carb*i.grams/100),0);
     const totFat=_mealIngredients.reduce((a,i)=>a+(i.fat*i.grams/100),0);
-    const totalGrams=_mealIngredients.reduce((a,i)=>a+i.grams,0);
-    // Store as a single food entry (per 100g normalized)
-    const entry={name,kcal:totKcal/(totalGrams/100),prot:totProt/(totalGrams/100),carb:totCarb/(totalGrams/100),fat:totFat/(totalGrams/100),grams:totalGrams,isMeal:true};
+    const totalIngGrams=_mealIngredients.reduce((a,i)=>a+i.grams,0);
+    // If cooked weight + portion specified → use ratio for precise calculation
+    const cookedW=_mealCookedWeight;const portionW=_mealPortionWeight;
+    const ratio=cookedW>0&&portionW>0?portionW/cookedW:1;
+    const finalGrams=portionW||totalIngGrams;
+    const entry={
+      name,
+      kcal:(totKcal/totalIngGrams)*100, // normalize to per 100g
+      prot:(totProt/totalIngGrams)*100,
+      carb:(totCarb/totalIngGrams)*100,
+      fat:(totFat/totalIngGrams)*100,
+      grams:finalGrams,
+      isMeal:true,
+      portionInfo:cookedW>0&&portionW>0?`${portionW}g / ${cookedW}g cuit`:null,
+    };
     const today=todayKey();if(!S.nutritionData.foodLog[today])S.nutritionData.foodLog[today]=[];
     S.nutritionData.foodLog[today].push(entry);
     nutSched();closeModal();renderNutrition();
